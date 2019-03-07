@@ -795,44 +795,44 @@ for(method in conf[['method']]){
     #-------------------------
     ## Export browser files ##
     #-------------------------
-    #if (!file.exists(browserdir)) { dir.create(browserdir) }
-    #parallel.helper <- function(pattern) {
-    #    ## Export CNV and breakpoints
-    #    savename <- paste0(file.path(browserdir,sub('_$','',pattern)), strandseq.string)
-    #    if (!file.exists(paste0(savename,'_CNV.bed.gz'))) {
-    #        ifiles <- list.files(refinedmodeldir, pattern='RData$', full.names=TRUE)
-    #        ifiles <- grep(gsub('\\+','\\\\+',pattern), ifiles, value=TRUE)
-    #        exportCNVs(ifiles, filename=savename, cluster=conf[['cluster.plots']], export.CNV=TRUE, export.breakpoints=TRUE)
-    #    }
-    #    ## Breakpoint hotspots
-    #    savename <- file.path(browserdir,paste0(sub('_$','',pattern), strandseq.string, '_breakpoint-hotspots'))
-    #    if (!file.exists(paste0(savename,'.bed.gz'))) {
-    #        hotspots <- hslist[[pattern]]$hotspots
-    #        if (!is.null(hotspots)) {
-    #            exportGRanges(hotspots, filename=savename, trackname=basename(savename), score=hotspots$num.events, thickStart = hotspots$start.max, thickEnd = hotspots$end.max, priority=41)
-    #        }
-    #    }
-    #    ## Hotspot densities
-    #    savename <- file.path(browserdir,paste0(sub('_$','',pattern), strandseq.string, '_breakpoint-hotspot-densities'))
-    #    if (!file.exists(paste0(savename,'.wig.gz'))) {
-    #        densities <- hslist[[pattern]]$densities
-    #        if (!is.null(hotspots)) {
-    #            exportGRanges(densities, filename=savename, trackname=basename(savename), as.wiggle = TRUE, wiggle.val = densities$kde, priority=40)
-    #        }
-    #    }
-    #}
-    #if (numcpu > 1) {
-    #  ptm <- startTimedMessage("Exporting browser files ...")
-    #  temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %dopar% {
-    #    parallel.helper(pattern)
-    #  }
-    #  stopTimedMessage(ptm)
-    #} else {
-    #  # temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %do% {
-    #  for (pattern in patterns) {
-    #    parallel.helper(pattern)
-    #  }
-    #}
+    if (!file.exists(browserdir)) { dir.create(browserdir) }
+    parallel.helper <- function(pattern) {
+        ## Export CNV and breakpoints
+        savename <- paste0(file.path(browserdir,sub('_$','',pattern)), strandseq.string)
+        if (!file.exists(paste0(savename,'_CNV.bed.gz'))) {
+            ifiles <- list.files(refinedmodeldir, pattern='RData$', full.names=TRUE)
+            ifiles <- grep(gsub('\\+','\\\\+',pattern), ifiles, value=TRUE)
+            exportCNVs(ifiles, filename=savename, cluster=conf[['cluster.plots']], export.CNV=TRUE, export.breakpoints=TRUE)
+        }
+        ## Breakpoint hotspots
+        savename <- file.path(browserdir,paste0(sub('_$','',pattern), strandseq.string, '_breakpoint-hotspots'))
+        if (!file.exists(paste0(savename,'.bed.gz'))) {
+            hotspots <- hslist[[pattern]]$hotspots
+            if (!is.null(hotspots)) {
+                exportGRanges(hotspots, filename=savename, trackname=basename(savename), score=hotspots$num.events, thickStart = hotspots$start.max, thickEnd = hotspots$end.max, priority=41)
+            }
+        }
+        ## Hotspot densities
+        savename <- file.path(browserdir,paste0(sub('_$','',pattern), strandseq.string, '_breakpoint-hotspot-densities'))
+        if (!file.exists(paste0(savename,'.wig.gz'))) {
+            densities <- hslist[[pattern]]$densities
+            if (!is.null(hotspots)) {
+                exportGRanges(densities, filename=savename, trackname=basename(savename), as.wiggle = TRUE, wiggle.val = densities$kde, priority=40)
+            }
+        }
+    }
+    if (numcpu > 1) {
+      ptm <- startTimedMessage("Exporting browser files ...")
+      temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %dopar% {
+        parallel.helper(pattern)
+      }
+     stopTimedMessage(ptm)
+    } else {
+      # temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %do% {
+      for (pattern in patterns) {
+        parallel.helper(pattern)
+      }
+    }
   
     #------------------
     ## Plot profiles ##
