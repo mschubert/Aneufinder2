@@ -8,6 +8,11 @@
 # Last modified: 05-11-18
 # Version:       1.0
 # ---------------------------------------------------------------------------------------------------------------------
+# This R code ...
+# ---------------------------------------------------------------------------------------------------------------------
+
+# Patchwork
+
 # ---------------------------------------------------------------------------------------------------------------------
 #                                                     Functions
 # ---------------------------------------------------------------------------------------------------------------------
@@ -46,6 +51,14 @@ RW_bam2GRanges <- function(bamfile, bamindex, chrom.lengths, pairedEndReads=FALS
     }
     stop(paste0('No reads imported! Check your BAM-file ', bamfile))
   }
+  reads                 <- keepSeqlevels(reads, as.character(unique(seqnames(reads))))
+  na.seqlevels          <- seqlevels(reads)[is.na(seqlengths(reads))]
+  reads                 <- reads[seqnames(reads) %in% seqlevels(reads)[!is.na(seqlengths(reads))]]
+  reads                 <- keepSeqlevels(reads, as.character(unique(seqnames(reads))))
+  if(length(na.seqlevels) > 0){
+    warning("Dropped seqlevels because no length information was available: ", paste0(na.seqlevels, collapse=', '))
+  }
+  attr(reads, 'ID')     <- basename(bamfile)
   return(reads)
 }
 
@@ -86,6 +99,14 @@ RW_bed2GRanges <- function(bedfile, chrom.lengths, remove.duplicate.reads=TRUE, 
     overlaps <- findOverlaps(reads, blacklist)
     reads    <- reads[setdiff(1:length(reads), S4Vectors::queryHits(overlaps))]
   }
+  reads                 <- keepSeqlevels(reads, as.character(unique(seqnames(reads))))
+  na.seqlevels          <- seqlevels(reads)[is.na(seqlengths(reads))]
+  reads                 <- reads[seqnames(reads) %in% seqlevels(reads)[!is.na(seqlengths(reads))]]
+  reads                 <- keepSeqlevels(reads, as.character(unique(seqnames(reads))))
+  if(length(na.seqlevels) > 0){
+    warning("Dropped seqlevels because no length information was available: ", paste0(na.seqlevels, collapse=', '))
+  }
+  attr(reads, 'ID')     <- basename(bedfile)
   return(reads)
 }
 
