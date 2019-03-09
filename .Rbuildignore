@@ -1,0 +1,8 @@
+^Meta$
+^doc$
+\.gitignore
+Makefile
+README\.md
+^\.travis\.yml$
+^\.travis-ssh\.sh$
+R/backup

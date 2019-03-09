@@ -1,496 +1,646 @@
 
+# =====================================================================================================================
+#                                                    Aneufinder.R
+# =====================================================================================================================
+# Organization:  ERIBA (CRIPSR/iPSC facility)
+# Programmer:    René Wardenaar (Original code written by Aaron Taudt)
+# Starting date: 25-09-18
+# Last modified: 07-03-19
+# Version:       1.0
+# ---------------------------------------------------------------------------------------------------------------------
 
-#' Wrapper function for the \code{\link{AneuFinder}} package
-#'
-#' This function is an easy-to-use wrapper to \link[AneuFinder:binning]{bin the data}, \link[AneuFinder:findCNVs]{find copy-number-variations}, \link[AneuFinder:getBreakpoints]{locate breakpoints}, plot \link[AneuFinder:heatmapGenomewide]{genomewide heatmaps}, \link[AneuFinder:plot.aneuHMM]{distributions, profiles and karyograms}.
-#'
-#' @param inputfolder Folder with either BAM or BED files.
-#' @param outputfolder Folder to output the results. If it does not exist it will be created.
-#' @param configfile A file specifying the parameters of this function (without \code{inputfolder}, \code{outputfolder} and \code{configfile}). Having the parameters in a file can be handy if many samples with the same parameter settings are to be run. If a \code{configfile} is specified, it will take priority over the command line parameters.
-#' @param numCPU The numbers of CPUs that are used. Should not be more than available on your machine.
-#' @param reuse.existing.files A logical indicating whether or not existing files in \code{outputfolder} should be reused.
-#' @inheritParams bam2GRanges
-#' @inheritParams bed2GRanges
-#' @inheritParams binReads
-#' @param reads.store Set \code{reads.store=TRUE} to store read fragments as RData in folder 'data' and as BED files in 'BROWSERFILES/data'. This option will force \code{use.bamsignals=FALSE}.
-#' @param correction.method Correction methods to be used for the binned read counts. Currently only \code{'GC'}.
-#' @param GC.BSgenome A \code{BSgenome} object which contains the DNA sequence that is used for the GC correction.
-# #' @param mappability.reference A file that serves as reference for mappability correction.
-#' @param strandseq A logical indicating whether the data comes from Strand-seq experiments. If \code{TRUE}, both strands carry information and are treated separately.
-#' @inheritParams edivisive.findCNVs
-#' @inheritParams HMM.findCNVs
-#' @inheritParams findCNVs
-#' @param confint Desired confidence interval for breakpoints. Set \code{confint=NULL} to disable confidence interval estimation. Confidence interval estimation will force \code{reads.store=TRUE}.
-#' @param refine.breakpoints A logical indicating whether breakpoints from the HMM should be refined with read-level information. \code{refine.breakpoints=TRUE} will force \code{reads.store=TRUE}.
-#' @param hotspot.bandwidth A vector the same length as \code{binsizes} with bandwidths for breakpoint hotspot detection (see \code{\link{hotspotter}} for further details). If \code{NULL}, the bandwidth will be chosen automatically as the average distance between reads.
-#' @param hotspot.pval P-value for breakpoint hotspot detection (see \code{\link{hotspotter}} for further details). Set \code{hotspot.pval = NULL} to skip hotspot detection.
-#' @param cluster.plots A logical indicating whether plots should be clustered by similarity.
-#' @return \code{NULL}
-#' @author Aaron Taudt
-#' @import foreach
-#' @import doParallel
-#' @importFrom grDevices dev.off pdf
-#' @importFrom graphics plot
-#' @importFrom utils read.table write.table
-#' @importFrom cowplot plot_grid
-#' @export
-#'
-#'@examples
-#'\dontrun{
-#'## The following call produces plots and genome browser files for all BAM files in "my-data-folder"
-#'Aneufinder(inputfolder="my-data-folder", outputfolder="my-output-folder")}
-#'
-Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1, reuse.existing.files=TRUE, binsizes=1e6, stepsizes=binsizes, variable.width.reference=NULL, reads.per.bin=NULL, pairedEndReads=FALSE, assembly=NULL, chromosomes=NULL, remove.duplicate.reads=TRUE, min.mapq=10, blacklist=NULL, use.bamsignals=FALSE, reads.store=FALSE, correction.method=NULL, GC.BSgenome=NULL, method=c('edivisive'), strandseq=FALSE, R=10, sig.lvl=0.1, eps=0.01, max.time=60, max.iter=5000, num.trials=15, states=c('zero-inflation',paste0(0:10,'-somy')), confint=NULL, refine.breakpoints=FALSE, hotspot.bandwidth=NULL, hotspot.pval=5e-2, cluster.plots=TRUE) {
 
-#=======================
-### Helper functions ###
-#=======================
-as.object <- function(x) {
-  return(eval(parse(text=x)))
-}
+# =====================================================================================================================
+# PART 0 of 4 | ARGUMENTS AND DEFAULT SETTINGS
+# =====================================================================================================================
 
-#========================
-### General variables ###
-#========================
-conf <- NULL
-if (is.character(configfile)) {
-  ## Read config file ##
+Aneufinder <- function(inputfolder,
+                       outputfolder,
+                       configfile=NULL,
+                       numCPU=1,                                                                                       # [GENERAL]
+                       reuse.existing.files=TRUE,
+                       binsizes=1e6,                                                                                   # [BINNING]
+                       stepsizes=binsizes,
+                       variable.width.reference=NULL,
+                       reads.per.bin=NULL,
+                       pairedEndReads=FALSE,
+                       assembly=NULL,
+                       chromosomes=NULL,
+                       remove.duplicate.reads=TRUE,
+                       min.mapq=10,
+                       blacklist=NULL,
+                       use.bamsignals=FALSE,
+                       reads.store=FALSE,
+                       correction.method=NULL,                                                                         # [CORRECTION]
+                       GC.BSgenome=NULL,
+                       method='edivisive',                                                                             # [COPYNUMBERCALLING]
+                       strandseq=FALSE,
+                       R=10,
+                       sig.lvl=0.1,
+                       eps=0.01,
+                       max.time=60,
+                       max.iter=5000,
+                       num.trials=15,
+                       states=c('zero-inflation',paste0(0:10,'-somy')),
+                       most.frequent.state='2-somy',                                                                   # N: New!
+                       most.frequent.state.strandseq='1-somy',                                                         # N: New!
+                       confint=NULL,
+                       refine.breakpoints=FALSE,
+                       hotspot.bandwidth=NULL,
+                       hotspot.pval=5e-2,
+                       cluster.plots=TRUE){
+
+
+# =====================================================================================================================
+# PART 1 OF 4 | PREPARATION
+# =====================================================================================================================
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.01 | READ CONFIG FILE
+# ---------------------------------------------------------------------------------------------------------------------
+
+conf                    <- NULL
+
+if(!is.null(configfile)){
   errstring <- tryCatch({
-    conf <- readConfig(configfile)
-    errstring <- ''
+    conf                <- RW_readConfig(configfile)
+    errstring           <- ''
   }, error = function(err) {
-    errstring <- paste0("Could not read configuration file ",configfile)
+    errstring           <- paste0("Could not read configuration file ",configfile)
   })
-  if (errstring!='') {
+  if(errstring!='') {
     stop(errstring)
   }
 }
-total.time <- proc.time()
 
-## Convert GC.BSgenome to string if necessary
-if (class(GC.BSgenome)=='BSgenome') {
-  GC.BSgenome <- attributes(GC.BSgenome)$pkgname
-}
 
-## reads.store
-if (!is.null(conf[['confint']])) {
-  confint <- conf[['confint']]
-}
-if (!is.null(conf[['refine.breakpoints']])) {
-  refine.breakpoints <- conf[['refine.breakpoints']]
-}
-if (refine.breakpoints & is.null(confint)) {
-  confint <- 0.99
-  conf[['confint']] <- confint
-  warning("Changed 'confint=NULL' to 'confint=0.99' because 'refine.breakpoints=TRUE'.")
-}
-if (!is.null(confint) | refine.breakpoints) {
-  if (reads.store == FALSE) {
-    warning("Changed 'reads.store=TRUE' because we need it for confidence intervals and breakpoint refinement.")
-  }
-  reads.store <- TRUE
-  conf[['reads.store']] <- TRUE
-}
-if (!is.null(conf[['reads.store']])) {
-  reads.store <- conf[['reads.store']]
-}
-if (reads.store) {
-  use.bamsignals <- FALSE
-  conf[['use.bamsignals']] <- FALSE
-}
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.02 | COMBINE ARGUMENTS CONFIG FILE WITH SUPPLIED ARGUMENTS
+# ---------------------------------------------------------------------------------------------------------------------
 
-if (length(hotspot.bandwidth) != length(binsizes) & !is.null(hotspot.bandwidth)) {
-  hotspot.bandwidth <- rep(hotspot.bandwidth, length(binsizes))[1:length(binsizes)]
-}
+params                   <- list(inputfolder=inputfolder, outputfolder=outputfolder, numCPU=numCPU,
+                                 reuse.existing.files=reuse.existing.files, binsizes=binsizes, stepsizes=stepsizes,
+                                 variable.width.reference=variable.width.reference, reads.per.bin=reads.per.bin,
+                                 pairedEndReads=pairedEndReads, assembly=assembly, chromosomes=chromosomes,
+                                 remove.duplicate.reads=remove.duplicate.reads, min.mapq=min.mapq, blacklist=blacklist,
+                                 reads.store=reads.store, use.bamsignals=use.bamsignals,
+                                 correction.method=correction.method, GC.BSgenome=GC.BSgenome, method=method,
+                                 strandseq=strandseq, eps=eps, max.time=max.time, max.iter=max.iter,
+                                 num.trials=num.trials, states=states, most.frequent.state=most.frequent.state,
+                                 most.frequent.state.strandseq=most.frequent.state.strandseq, R=R, sig.lvl=sig.lvl,
+                                 confint=confint, refine.breakpoints=refine.breakpoints,
+                                 hotspot.bandwidth=hotspot.bandwidth, hotspot.pval=hotspot.pval,
+                                 cluster.plots=cluster.plots)
+conf                    <- c(conf, params[setdiff(names(params),names(conf))])
 
-## Convert numCPU to numeric
-numCPU <- as.numeric(numCPU)
 
-## Put options into list and merge with conf
-params <- list(numCPU=numCPU, reuse.existing.files=reuse.existing.files, binsizes=binsizes, stepsizes=stepsizes, variable.width.reference=variable.width.reference, reads.per.bin=reads.per.bin, pairedEndReads=pairedEndReads, assembly=assembly, chromosomes=chromosomes, remove.duplicate.reads=remove.duplicate.reads, min.mapq=min.mapq, blacklist=blacklist, reads.store=reads.store, use.bamsignals=use.bamsignals, correction.method=correction.method, GC.BSgenome=GC.BSgenome, method=method, strandseq=strandseq, eps=eps, max.time=max.time, max.iter=max.iter, num.trials=num.trials, states=states, R=R, sig.lvl=sig.lvl, confint=confint, refine.breakpoints=refine.breakpoints, hotspot.bandwidth=hotspot.bandwidth, hotspot.pval=hotspot.pval, cluster.plots=cluster.plots)
-conf <- c(conf, params[setdiff(names(params),names(conf))])
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.03 | CHECK CLASS
+# ---------------------------------------------------------------------------------------------------------------------
 
-## Check user input
-if ('GC' %in% conf[['correction.method']] & is.null(conf[['GC.BSgenome']])) {
-    stop("Option 'GC.bsgenome' has to be given if correction.method='GC'.")
+checkClass(conf=conf)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.04 | GET INPUT FILES AND CHECK FORMAT
+# ---------------------------------------------------------------------------------------------------------------------
+
+input.files             <- list.files(inputfolder, full.names=TRUE, pattern='\\.bam$|\\.bed$|\\.bed\\.gz$')
+
+if(length(input.files) == 0){
+  stop("None of the input files have the correct format. Expected formats are '.bam', '.bed' and '.bed.gz'")
 }
 
-## Determine format
-files <- list.files(inputfolder, full.names=TRUE)
-files.clean <- sub('\\.gz$','', files)
-formats <- sapply(strsplit(files.clean, '\\.'), function(x) { rev(x)[1] })
-datafiles <- files[formats %in% c('bam','bed')]
-files.clean <- sub('\\.gz$','', datafiles)
-formats <- sapply(strsplit(files.clean, '\\.'), function(x) { rev(x)[1] })
-if (any(formats == 'bed') & is.null(conf[['assembly']])) {
-  stop("Please specify 'assembly' if you have BED files in your inputfolder.")
+files.clean             <- sub('\\.gz$','',input.files)
+input.type              <- unique(sapply(strsplit(files.clean,'\\.'),function(x){rev(x)[1]}))
+
+if(length(input.type) == 2){
+  stop("Both bam and bed files in input directory. Only one type allowed.")                                            # N: Check if input files is a mix of different types (bam, bed, bed.gz). Allow only one.
 }
 
-## Helpers
-binsizes <- conf[['binsizes']]
-stepsizes <- conf[['stepsizes']]
-reads.per.bins <- conf[['reads.per.bin']]
-patterns <- c(paste0('reads.per.bin_',reads.per.bins,'_'), paste0('binsize_',format(binsizes, scientific=TRUE, trim=TRUE),'_stepsize_',format(stepsizes, scientific=TRUE, trim=TRUE),'_'))
-patterns <- setdiff(patterns, c('reads.per.bin__','binsize__'))
-pattern <- NULL #ease R CMD check
-numcpu <- conf[['numCPU']]
-if (!is.null(conf[['hotspot.bandwidth']])) {
-  names(conf[['hotspot.bandwidth']]) <- patterns
-}
 
-## Set up the directory structure ##
-readspath <- file.path(outputfolder,'data')
-binpath.uncorrected <- file.path(outputfolder,'binned')
-modelpath <- file.path(outputfolder, 'MODELS')
-if (strandseq) {
-    modelpath <- paste0(modelpath, '-StrandSeq')
-}
-refinedmodelpath <- paste0(modelpath, '_refined')
-plotpath <- file.path(outputfolder, 'PLOTS')
-browserpath <- file.path(outputfolder, 'BROWSERFILES')
-readsbrowserpath <- file.path(browserpath,'data')
-## Delete old directory if desired ##
-if (conf[['reuse.existing.files']]==FALSE) {
-  if (file.exists(outputfolder)) {
-    message("Deleting old directory ",outputfolder)
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.05 | [GENERAL]
+# ---------------------------------------------------------------------------------------------------------------------
+
+if(conf[['reuse.existing.files']] == FALSE){                                                                           # N: Delete old directory if desired
+  if(file.exists(outputfolder)){
+    message("Deleting old directory: ",outputfolder)
     unlink(outputfolder, recursive=TRUE)
   }
 }
-if (!file.exists(outputfolder)) {
-  dir.create(outputfolder)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.06 | [BINNING]
+# ---------------------------------------------------------------------------------------------------------------------
+
+if(is.null(conf[['stepsizes']])){
+  conf[['stepsizes']]   <- conf[['binsizes']]
 }
-## Make a copy of the conf file
-writeConfig(conf, configfile=file.path(outputfolder, 'AneuFinder.config'))
+
+if(length(conf[['binsizes']]) != length(conf[['stepsizes']])){
+  stop("Need one element in 'stepsizes' for each element in 'binsizes'.")
+}
+
+if(any(conf[['binsizes']] < conf[['stepsizes']])){
+  stop("'stepsizes' must be smaller/equal than 'binsizes'")
+}
+
+if(!is.null(conf[['variable.width.reference']])){
+  file.clean            <- sub('\\.gz$','',conf[['variable.width.reference']])
+  ref.type              <- rev(strsplit(file.clean,'\\.')[[1]])[1]
+  if((ref.type != 'bam') & (ref.type != 'bed')){
+    stop("The variable width reference file does not have the correct format.
+    The expected formats are '.bam', '.bed' and '.bed.gz'")
+  }
+  if(!file.exists(conf[['variable.width.reference']])){
+    stop("variable.width.reference file '",conf[['variable.width.reference']],"' does not exist.")
+  }
+}
+
+if(!is.null(conf[['reads.per.bin']])){
+  if(conf[['reads.per.bin']] < 1){
+    stop("The number of reads per bin is smaller than the minimum allowed (<1).")
+  }
+}
+
+if(conf[['min.mapq']] < 0){
+  stop("Unusual low 'min.mapq': ",conf[['min.mapq']]) 
+}
+
+if(is.character(conf[['blacklist']])){
+  file.clean            <- sub('\\.gz$','',conf[['blacklist']])
+  black.type            <- rev(strsplit(file.clean,'\\.')[[1]])[1]
+  if(black.type != 'bed'){
+    stop("The blacklist has the wrong file format: ",file.format,". Allowed formats are: 'bed' (tab delimited)")
+  }
+  if(!file.exists(conf[['blacklist']])){
+    stop("Blacklist file '",conf[['blacklist']],"' does not exist.")
+  }
+  conf[['blacklist']]   <- suppressMessages(readBed(conf[['blacklist']], track.line="auto", remove.unusual=FALSE,
+                             zero.based=TRUE))
+  if(class(conf[['blacklist']])[1] != "GRanges"){
+    stop("Something went wrong with reading the bed file. Please check whether the bed file is tab delimited.")
+  }
+}
 
 
-#===================
-### Write README ###
-#===================
-savename <- file.path(outputfolder, 'README.txt')
-cat("", file=savename)
-cat("This folder contains the following files:\n", file=savename, append=TRUE)
-cat("-----------------------------------------\n", file=savename, append=TRUE)
-cat("- chrominfo.tsv: A tab-separated file with chromosome lengths.\n", file=savename, append=TRUE)
-cat("- AneuFinder.config: A text file with all the parameters that were used to run Aneufinder().\n", append=TRUE, file=savename)
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.07 [CORRECTION]
+# ---------------------------------------------------------------------------------------------------------------------
 
-cat("\n", file=savename, append=TRUE)
-cat("This folder contains the following folders. Some folders are [optional] depending on the parameters:\n", file=savename, append=TRUE)
-cat("-------------------------------------------\n", file=savename, append=TRUE)
-cat("- binned: RData files with the results of the binnig step. Contains GRanges objects with binned genomic coordinates and read counts.\n", file=savename, append=TRUE)
-cat("- [binned-GC]: RData files with the results of the GC-correction step. Depends on option 'correction.method=\"GC\"'. Contains GRanges objects with binned genomic coordinates and read counts.\n", file=savename, append=TRUE)
-cat("- BROWSERFILES: Bed files for upload to the UCSC genome browser.\n", file=savename, append=TRUE)
-cat("- [data]: RData files with GRanges containing read-fragments. Depends on option 'reads.store=TRUE'.\n", file=savename, append=TRUE)
-cat("- MODELS [or MODELS-StrandSeq]: RData files with aneuHMM objects. Result of the copy-number and breakpoint estimation step. Depends on option 'strandseq=TRUE'.\n", file=savename, append=TRUE)
-cat("- MODELS_refined [or MODELS-StrandSeq_refined]: RData files with aneuHMM objects after the breakpoint refinement step. Depends on option 'strandseq=TRUE'.\n", file=savename, append=TRUE)
-cat("- PLOTS: Several plots that are produced by default.\n", file=savename, append=TRUE)
+if(!all(conf[['correction.method']] %in% c('GC'))){                                                                    # Check if the correct correction method has been given.
+  stop("Unknown correction method: ",paste(setdiff(conf[['correction.method']],c("GC")),collapse=', '),".
+    Allowed methods are: 'GC'.")
+}
+
+if('GC' %in% conf[['correction.method']] & is.null(conf[['GC.BSgenome']])){                                            # Check whether method 'GC' is given in combination with 'GC.genome'
+  stop("Option 'GC.bsgenome' has to be given if correction.method='GC'.")
+}
+
+if(!is.null(conf[['GC.BSgenome']])){
+  if(is.character(conf[['GC.BSgenome']])){
+    eval(parse(text=paste0("conf[['GC.BSgenome']] <- ",conf[['GC.BSgenome']])))
+  }else if(class(conf[['GC.BSgenome']]) != 'BSgenome'){
+    stop("Unknown class for 'GC.BSgenome': ",class(GC.BSgenome),".
+      'GC.BSgenome' should either be of class 'character' or 'BSgenome'")
+  }
+}
 
 
-#======================
-### Parallelization ###
-#======================
-if (numcpu > 1) {
-  ptm <- startTimedMessage("Setting up parallel execution with ", numcpu, " CPUs ...")
-  cl <- parallel::makeCluster(numcpu)
-  doParallel::registerDoParallel(cl)
-  on.exit(
-    if (conf[['numCPU']] > 1) {
-      parallel::stopCluster(cl)
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.08 [COPYNUMBERCALLING]
+# ---------------------------------------------------------------------------------------------------------------------
+
+if(!all(conf[['method']] %in% c('HMM','dnacopy','edivisive'))){ 
+  stop("Unknown copynumber calling method ('method'): ",paste(setdiff(conf[['method']],c('HMM','dnacopy','edivisive')),
+    collapse=', '),". Allowed methods are: 'HMM', 'dnacopy' and 'edivisive'.")
+}
+
+if(conf[['R']] < 1){
+  stop("The maximum number of random permutations to use in each iteration of the permutation test should be 1 or
+    higher (method: edivisive). Current value ('R'): ",conf[['R']])
+}
+
+if(conf[['sig.lvl']] <= 0 | conf[['sig.lvl']] > 1){
+  stop("The statistical significance level for a proposed change point should be between 0 and 1. 
+   Current value ('sig.lvl'): ",conf[['sig.lvl']])
+}
+
+if(conf[['eps']] <= 0){
+  stop("The Convergence threshold for the Baum-Welch algorithm should be higher than 0.
+    Current value ('eps'): ",conf[['eps']])
+}
+
+if(conf[['eps']] > 0.1){
+  warning("Unusual high number for the Convergence threshold for the Baum-Welch algorithm (>0.1).
+    Current value ('eps'): ",conf[['eps']])
+}
+
+conf[['max.time']]      <- round(conf[['max.time']])                                                                   # Ensures that we get an integer.
+
+if(conf[['max.time']] < -1 | conf[['max.time']] == 0){
+  stop("The maximum running time in seconds for the Baum-Welch algorithm can have a value higher than zero or -1
+    (no limit). Current value ('max.time'): ",conf[['max.time']])
+}
+
+conf[['max.iter']]      <- round(conf[['max.iter']])                                                                   # Ensures that we get an integer.
+
+if(conf[['max.iter']] < -1 | conf[['max.iter']] == 0){
+  stop("The maximum number of iterations for the Baum-Welch algorithm can have a value higher than zero or -1
+    (no limit). Current value ('max.iter'): ",conf[['max.iter']])
+}
+
+conf[['num.trials']]    <- round(conf[['num.trials']])                                                                 # Ensures that we get an integer.
+
+if(conf[['num.trials']] <= 0){
+  stop("The number of trials to find a fit where state 'most.frequent.state' is most frequent should be higher than 0.
+    Current value ('num.trials'): ",conf[['num.trials']])
+}
+
+if(any(!grepl('zero-inflation|^[0-9]+-somy|+[0-9]+-somy',conf[['states']]))){
+  stop("")
+}
+if(any(table(conf[['states']]) != 1)){                                                                                 # Check non-unique states.
+  stop("States are not unique.")
+}
+if(any(grepl('zero-inflation',conf[['states']]))){
+  if(grep('zero-inflation',conf[['states']]) != 1){
+    stop("The zero-inflation state should be the first of all states.")
+  }
+}
+state.somy              <- grep('-somy',conf[['states']],value=TRUE)
+state.num               <- substr(state.somy,1,nchar(state.somy)-5)
+state.plus              <- grep('^\\+',state.num)
+if(length(state.plus) > 0){
+  if(length(state.plus) > 1){
+    stop("There is more than one +[number]-somy state.")
+  }
+  if(state.plus == length(state.num)){
+    state.num           <- state.num[-state.plus]
+  }
+}
+if(any(state.num != sort(as.numeric(state.num)))){
+  stop("States are not ordered.")
+}
+
+if(!conf[['most.frequent.state']] %in% conf[['states']]){
+  stop("argument 'most.frequent.state' must be one of c(",paste(states, collapse=","),")")
+}
+
+if(!conf[['most.frequent.state.strandseq']] %in% conf[['states']]){
+  stop("argument 'most.frequent.state.strandseq' must be one of c(",paste(states, collapse=","),")")
+}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.09 | CHECK CHROMOSOME FORMATS AND OVERLAP WITH SPECIFIED CHROMOSOMES
+# ---------------------------------------------------------------------------------------------------------------------
+
+if(input.type == 'bam'){                                                                                               # N: We take the chromosome format of the input files as the format to work with.
+  seq.names             <- GenomeInfoDb::seqlevels(Rsamtools::BamFile(input.files[1]))
+}else if(input.type == 'bed' | input.type == 'bed.gz'){
+  seq.names             <- GenomeInfoDb::seqlevels(readBed(input.files[1]))
+}
+
+if(all(grepl('^chr',seq.names))){
+  chrom.type            <- 'chr'
+}else if(all(!grepl('^chr',seq.names))){
+  chrom.type            <- 'num'
+}else{                                                                                                                 # Q: Check if there is a mix of chr and not chr?
+  stop("Inconsistency in chromosome names input files. Some start with 'chr' while others do not.")
+}
+
+chrom.missing           <- setdiff(conf[['chromosomes']],seq.names)
+
+if(length(chrom.missing) == length(conf[['chromosomes']])){
+  chr.string            <- paste0(chrom.missing, collapse=', ')
+  stop("The specified chromosomes ",chr.string, " are not found in the data (sam/bed files).
+    Pay attention to the naming convention in your data, e.g. 'chr1' or '1'.")
+}else if(length(chrom.missing) > 0){
+  chr.string            <- paste0(chrom.missing, collapse=', ')
+  warning(paste0('Not using chromosomes ',chr.string,' because they are not found in the data (sam/bed files).'))
+}
+
+if(!is.null(conf[['variable.width.reference']])){
+  if(ref.type == 'bam'){                                                                                               # N: Check 'variable.width.reference'
+    seq.names           <- GenomeInfoDb::seqlevels(Rsamtools::BamFile(conf[['variable.width.reference']]))
+  }else if(ref.type == 'bed'){
+    seq.names           <- GenomeInfoDb::seqlevels(readBed(conf[['variable.width.reference']]))
+  }
+  if(all(grepl('^chr',seq.names))){
+    if(chrom.type == 'num'){
+      stop("The specified chromosomes do not exist in the data.
+        Pay attention to the naming convention in your data, e.g. 'chr1' or '1'.")
     }
-  )
-  stopTimedMessage(ptm)
+  }else if(all(!grepl('^chr',seq.names))){
+    if(chrom.type == 'chr'){
+      stop("The specified chromosomes do not exist in the data.
+        Pay attention to the naming convention in your data, e.g. 'chr1' or '1'.")
+    }
+  }else{                                                                                                               # Q: Check if there is a mix of chr and not chr?
+    stop("Inconsistency in chromosome names variable width reference. Some start with 'chr' while others do not.")
+  }
+  chrom.missing         <- setdiff(conf[['chromosomes']],seq.names)
+  if(length(chrom.missing) == length(conf[['chromosomes']])){
+    chr.string          <- paste0(chrom.missing, collapse=', ')
+    stop("The specified chromosomes ",chr.string, " are not found in the data (variable.width.reference).
+      Pay attention to the naming convention in your data, e.g. 'chr1' or '1'.")
+  }else if(length(chrom.missing) > 0){
+    chr.string          <- paste0(chrom.missing, collapse=', ')
+    warning(paste0('Not using chromosomes ',chr.string,' because they are not found in the data
+     (variable.width.reference).'))
+  }
 }
 
-#==============
-### Binning ###
-#==============
-### Get chromosome lengths ###
-## Get first bam file
-bamfile <- grep('bam$', datafiles, value=TRUE)[1]
-if (!is.na(bamfile)) {
-    ptm <- startTimedMessage("Obtaining chromosome length information from file ", bamfile, " ...")
-    chrom.lengths <- GenomeInfoDb::seqlengths(Rsamtools::BamFile(bamfile))
-    stopTimedMessage(ptm)
-} else {
-    ## Read chromosome length information
-    if (is.character(conf[['assembly']])) {
-        if (file.exists(conf[['assembly']])) {
-            ptm <- startTimedMessage("Obtaining chromosome length information from file ", conf[['assembly']], " ...")
-            df <- utils::read.table(conf[['assembly']], sep='\t', header=TRUE)
-            stopTimedMessage(ptm)
-        } else {
-            ptm <- startTimedMessage("Obtaining chromosome length information from UCSC ...")
-            df.chroms <- GenomeInfoDb::fetchExtendedChromInfoFromUCSC(conf[['assembly']])
-            ## Get first bed file
-            bedfile <- grep('bed$|bed.gz$', datafiles, value=TRUE)[1]
-            if (!is.na(bedfile)) {
-                firstline <- read.table(bedfile, nrows=1)
-                if (grepl('^chr',firstline[1,1])) {
-                    df <- df.chroms[,c('UCSC_seqlevel','UCSC_seqlength')]
-                } else {
-                    df <- df.chroms[,c('NCBI_seqlevel','UCSC_seqlength')]
-                }
-            }
-            stopTimedMessage(ptm)
-        }
-    } else if (is.data.frame(conf[['assembly']])) {
-        df <- conf[['assembly']]
-    } else {
-        stop("'assembly' must be either a data.frame with columns 'chromosome' and 'length' or a character specifying the assembly.")
+if(!is.null(conf[['blacklist']])){
+  seq.names             <- GenomeInfoDb::seqlevels(conf[['blacklist']])
+  if(all(grepl('^chr',seq.names))){
+    if(chrom.type == 'num'){
+      seqlevels(conf[['blacklist']]) <- sub('chr','',seqlevels(conf[['blacklist']]))
     }
-    chrom.lengths <- df[,2]
-    names(chrom.lengths) <- df[,1]
-    chrom.lengths <- chrom.lengths[!is.na(chrom.lengths) & !is.na(names(chrom.lengths))]
+  }else if(all(!grepl('^chr',seq.names))){
+    if(chrom.type == 'chr'){
+      seqlevels(conf[['blacklist']]) <- paste0('chr',seqlevels(conf[['blacklist']]))
+    }
+  }else{                                                                                                               # Q: Check if there is a mix of chr and not chr?
+    stop("Inconsistency in chromosome names blacklist. Some start with 'chr' while others do not.")
+  }
+  chrom.missing         <- setdiff(conf[['chromosomes']],seq.names)
+  if(length(chrom.missing) == length(conf[['chromosomes']])){
+    chr.string          <- paste0(chrom.missing, collapse=', ')
+    stop("The specified chromosomes ",chr.string," are not found in the data (blacklist).
+      Pay attention to the naming convention in your data, e.g. 'chr1' or '1'.")
+  }else if(length(chrom.missing) > 0){
+    chr.string          <- paste0(chrom.missing, collapse=', ')
+    warning(paste0("Not using chromosomes ",chr.string," because they are not found in the data (blacklist)."))
+  }
 }
-chrom.lengths.df <- data.frame(chromosome=names(chrom.lengths), length=chrom.lengths)
-## Write chromosome length information to file
-utils::write.table(chrom.lengths.df, file=file.path(outputfolder, 'chrominfo.tsv'), sep='\t', row.names=FALSE, col.names=TRUE, quote=FALSE)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.10 | GET CHROMOSOME LENGTHS
+# ---------------------------------------------------------------------------------------------------------------------
+
+chrom.lengths           <- RW_chromosomeLengths(assembly=conf[['assembly']],chrom.type=chrom.type,                     # N: We can indicate what kind of source is used.
+                             input.files=input.files)
+chrom.lengths           <- chrom.lengths[which(names(chrom.lengths) %in% conf[['chromosomes']])]
+chrom.missing           <- setdiff(conf[['chromosomes']],names(chrom.lengths))
+
+if(length(chrom.missing) == length(conf[['chromosomes']])){
+  chr.string            <- paste0(chrom.missing, collapse=', ')
+  stop("The specified chromosomes ",chr.string," are not found within the object or file that is specifying the
+    chromosome lengths. Pay attention to the naming convention in your data, e.g. 'chr1' or '1'.")
+}else if(length(chrom.missing) > 0){
+  chr.string            <- paste0(chrom.missing, collapse=', ')
+  warning(paste0('Not using chromosomes ',chr.string,' because the object or file that is specifying the chromosome
+    lengths does not contain them.'))
+}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 1.11 | CREATE OUTPUT DIRECTORY
+# ---------------------------------------------------------------------------------------------------------------------
+
+if(!file.exists(conf[['outputfolder']])){
+  dir.create(conf[['outputfolder']])
+}
+
+
+# =====================================================================================================================
+# PART 2 OF 4 | FILTERING, BINNING AND CORRECTING THE DATA
+# =====================================================================================================================
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 2.01 | MAKE BIN LIST
+# ---------------------------------------------------------------------------------------------------------------------
+
+bins.list               <- RW_fixedWidthBins(chrom.lengths=chrom.lengths, binsizes=conf[['binsizes']],
+                             stepsizes=conf[['stepsizes']])
+
+if(!is.null(conf[['variable.width.reference']])){                                                                      # Q: This part takes a long time. Can we skip it if the binned files are already present? Check if all expected files are there based on names input files etc.
+  if(ref.type == 'bam'){
+    bam.index.ref       <- paste0(conf[['variable.width.reference']],".bai")
+    if(!file.exists(bam.index.ref)){
+      bam.index.ref     <- Rsamtools::indexBam(conf[['variable.width.reference']])
+      warning("Couldn't find BAM index-file. Creating our own file ", bam.index.ref," instead.")
+    }
+    reads.ref           <- RW_bam2GRanges(bamfile=conf[['variable.width.reference']], bamindex=bam.index.ref,
+                             chrom.lengths=chrom.lengths, pairedEndReads=conf[['pairedEndReads']],
+                             remove.duplicate.reads=conf[['remove.duplicate.reads']], min.mapq=conf[['min.mapq']],
+                             blacklist=blacklist)
+  }else if(ref.type == 'bed'){
+    reads.ref           <- RW_bed2GRanges(bedfile=conf[['variable.width.reference']], chrom.lengths=chrom.lengths,
+                             remove.duplicate.reads=conf[['remove.duplicate.reads']], min.mapq=conf[['min.mapq']],
+                             blacklist=blacklist)
+  }
+  binned.ref            <- list()
+  for(cbss in names(bins.list)){                                                                                       # N: cbss: combination bin step and size
+    binned.ref[[cbss]]  <- RW_binReads(reads=reads.ref, bins=bins.list[[cbss]])
+  }
+  #binned.ref            <- RW_binReads(reads=reads.ref, bins.list=bins.list)
+  
+  bins.list             <- NULL
+  bins.list             <- RW_variableWidthBins(reads=reads.ref, binned.list=binned.ref)
+}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 2.02 | GET READ DATA AND FILTER
+# ---------------------------------------------------------------------------------------------------------------------
+
+path.filtered.reads     <- file.path(conf[['outputfolder']],'filtered')
+if(!file.exists(path.filtered.reads)){dir.create(path.filtered.reads)}
+
+files.to.do             <- setdiff(basename(input.files),list.files(path.filtered.reads,full.names=FALSE))
+files.to.do             <- file.path(conf[['inputfolder']],files.to.do)
+
+for(file.cur in files.to.do){
+  if(input.type == "bam"){
+    bam.index           <- paste0(file.cur,".bai")
+    if(!file.exists(bam.index)){
+      bam.index         <- Rsamtools::indexBam(file.cur)
+      warning("Couldn't find BAM index-file. Creating our own file ",bam.index," instead.")
+    }
+    reads               <- RW_bam2GRanges(bamfile=file.cur, bamindex=bam.index, chrom.lengths=chrom.lengths,
+                             pairedEndReads=conf[['pairedEndReads']],
+                             remove.duplicate.reads=conf[['remove.duplicate.reads']],
+                             min.mapq=conf[['min.mapq']], blacklist=blacklist)
+  }else if(input.type == "bed"){
+    reads               <- RW_bed2GRanges(bedfile=file.cur, chrom.lengths=chrom.lengths,
+                             remove.duplicate.reads=conf[['remove.duplicate.reads']],
+                             min.mapq=conf[['min.mapq']], blacklist=blacklist)
+  }
+  save(reads,file=file.path(path.filtered.reads,paste0(basename(file.cur),'.Rdata')))
+}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 2.03 | BIN THE READS
+# ---------------------------------------------------------------------------------------------------------------------
+
+path.uncorrected.bins   <- file.path(conf[['outputfolder']],'binned')
+if(!file.exists(path.uncorrected.bins)){dir.create(path.uncorrected.bins)}
+
+files.to.do             <- list.files(path.filtered.reads,full.names=TRUE)
+
+for(file.cur in files.to.do){
+  reads                 <- get(load(file.cur))
+  for(ibss in 1:length(conf[['binsizes']])){                                                                           # ibss: index bin step size combinations
+    binsize             <- conf[['binsizes']][ibss]
+    stepsize            <- conf[['stepsizes']][ibss]
+    combi               <- paste0("binsize_",format(binsize,scientific=TRUE,trim=TRUE),"_stepsize_",
+                             format(stepsize,scientific=TRUE,trim=TRUE))
+    inp_file            <- basename(file.cur)
+    inp_file            <- substr(inp_file,1,(nchar(inp_file)-6))
+    file.save           <- file.path(path.uncorrected.bins,paste0(inp_file,"_",combi,".RData"))
+    if(!file.exists(file.save)){
+      binned            <- RW_binReads(reads=reads,bins=bins.list[[combi]])
+      save(binned,file=file.save)
+    }
+  }
+}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 2.04 | CORRECT READ COUNT
+# ---------------------------------------------------------------------------------------------------------------------
+
+if(!is.null(conf[['correction.method']])){                                                                             # Q: Note: after correction the total bin count differs from the sum of positive and negative strand due to rounding. Should we somehow 'fix' this?
+  path.corrected.bins   <- paste0(path.uncorrected.bins,'-',conf[['correction.method']])
+  if(!file.exists(path.corrected.bins)){dir.create(path.corrected.bins)}
+  if(conf[['correction.method']] == 'GC'){
+    bins.list.GC        <- RW_getGCContentBins(bins.list=bins.list,GC.BSgenome=conf[['GC.BSgenome']])
+  }
+  files.to.do           <- setdiff(list.files(path.uncorrected.bins,full.names=FALSE),
+                             list.files(path.corrected.bins,full.names=FALSE))
+  files.to.do           <- file.path(path.uncorrected.bins,files.to.do)
+  for(file.cur in files.to.do){
+    if(conf[['correction.method']] == 'GC'){
+      binned            <- get(load(file.cur))
+      split_res         <- strsplit(basename(file.cur),"_binsize_")                                                    # N: Split on "_binsize_"
+      combi             <- paste0("binsize_",substr(split_res[[1]][2],1,(nchar(split_res[[1]][2])-6)))                 # N: Remove ".RData" and add again "binsize_"
+      binned.GC         <- merge(binned,bins.list.GC[[combi]])
+      binned.GC.cor     <- RW_correctGC(binned.gc=binned.GC,method='loess')
+      save(binned.GC.cor,file=file.path(path.corrected.bins,basename(file.cur)))
+    }
+  }
+}else{
+  path.corrected.bins   <- path.uncorrected.bins  
+}
+
+
+# =====================================================================================================================
+# PART 3 OF 4 | RUN MODELS
+# =====================================================================================================================
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 3.01 | RUN MODELS
+# ---------------------------------------------------------------------------------------------------------------------
+
+path.model              <- file.path(conf[['outputfolder']],'MODELS')
+if(!file.exists(path.model)){dir.create(path.model)}
+
+####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE
+####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE
+####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE
+
+readspath               <- file.path(outputfolder,'data')
+modelpath               <- file.path(outputfolder, 'MODELS')
+refinedmodelpath        <- paste0(modelpath, '_refined')
+plotpath                <- file.path(outputfolder, 'PLOTS')
+browserpath             <- file.path(outputfolder, 'BROWSERFILES')
+
+
+numcpu                  <- conf[['numCPU']]
+
+
+binsizes                <- conf[['binsizes']]
+stepsizes               <- conf[['stepsizes']]
+reads.per.bins          <- conf[['reads.per.bin']]
+
+patterns                <- c(paste0('reads.per.bin_',reads.per.bins,'_'), paste0('binsize_',format(binsizes, scientific=TRUE, trim=TRUE),'_stepsize_',format(stepsizes, scientific=TRUE, trim=TRUE),'_'))
+patterns                <- setdiff(patterns, c('reads.per.bin__','binsize__'))
+
+patterns                <- substr(patterns,1,(nchar(patterns)-1))
+
+
+cl <- parallel::makeCluster(numcpu)
+doParallel::registerDoParallel(cl)
+on.exit(
+  if (conf[['numCPU']] > 1) {
+    parallel::stopCluster(cl)
+  }
+)
+
+
+
+#############################################################################################################################
+
+
+for(method in conf[['method']]){
+  path.method           <- file.path(path.model,paste0('method-',method))
+  if(!file.exists(path.method)){dir.create(path.method)}
+  files.to.do           <- setdiff(list.files(path.corrected.bins,full.names=FALSE),
+                             list.files(path.method,full.names=FALSE))
+  files.to.do           <- file.path(path.corrected.bins,files.to.do)
+  for(file.cur in files.to.do){
+    binned              <- get(load(file.cur))
+    model               <- RW_findCNVs(strandseq=conf[['strandseq']], binned=binned, ID=attr(binned,'ID'), method=method,
+                             R=conf[['R']], sig.lvl=conf[['sig.lvl']], eps=conf[['eps']], max.time=conf[['max.time']],
+                             max.iter=conf[['max.iter']], num.trials=conf[['num.trials']], states=conf[['states']],
+                             most.frequent.state=conf[['most.frequent.state']],
+                             most.frequent.state.strandseq=conf[['most.frequent.state.strandseq']])
     
+####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE
+####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE
+####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE ####### SWITCH TO PREVIOUS CODE FROM HERE
     
-### Make bins ###
-message("==> Making bins:")
-if (!is.null(conf[['variable.width.reference']])) {
-  ## Determine format
-  file <- conf[['variable.width.reference']]
-  file.clean <- sub('\\.gz$','', file)
-  format <- rev(strsplit(file.clean, '\\.')[[1]])[1]
-  if (format == 'bam') {
-    reads <- bam2GRanges(conf[['variable.width.reference']], chromosomes=conf[['chromosomes']], pairedEndReads=conf[['pairedEndReads']], remove.duplicate.reads=conf[['remove.duplicate.reads']], min.mapq=conf[['min.mapq']], blacklist=conf[['blacklist']])
-  } else if (format == 'bed') {
-    reads <- bed2GRanges(conf[['variable.width.reference']], assembly=chrom.lengths.df, chromosomes=conf[['chromosomes']], remove.duplicate.reads=conf[['remove.duplicate.reads']], min.mapq=conf[['min.mapq']], blacklist=conf[['blacklist']])
-  }
-  bins <- variableWidthBins(reads, binsizes=conf[['binsizes']], stepsizes=conf[['stepsizes']], chromosomes=conf[['chromosomes']])
-} else {
-  bins <- fixedWidthBins(chrom.lengths=chrom.lengths, chromosomes=conf[['chromosomes']], binsizes=conf[['binsizes']], stepsizes=conf[['stepsizes']])
-}
-message("==| Finished making bins.")
-
-### Binning ###
-parallel.helper <- function(file) {
-  existing.binfiles <- grep(basename(file), list.files(binpath.uncorrected), value=TRUE)
-  existing.binsizes.stepsizes <- sub('_reads.per.bin.*', '', sub('.*_binsize', 'binsize', existing.binfiles))
-  existing.rpbin <- as.numeric(unlist(lapply(strsplit(existing.binfiles, split='binsize_|_reads.per.bin_|_\\.RData'), '[[', 3)))
-  binsizes.stepsizes.todo <- setdiff(sub('_$','',patterns), existing.binsizes.stepsizes)
-  rpbin.todo <- setdiff(reads.per.bins, existing.rpbin)
-  if (length(c(binsizes.stepsizes.todo,rpbin.todo)) > 0) {
-    tC <- tryCatch({
-      binReads(file=file, assembly=chrom.lengths.df, pairedEndReads=conf[['pairedEndReads']], binsizes=NULL, variable.width.reference=NULL, reads.per.bin=rpbin.todo, bins=bins[as.character(binsizes.stepsizes.todo)], chromosomes=conf[['chromosomes']], remove.duplicate.reads=conf[['remove.duplicate.reads']], min.mapq=conf[['min.mapq']], blacklist=conf[['blacklist']], outputfolder.binned=binpath.uncorrected, save.as.RData=TRUE, reads.store=conf[['reads.store']], outputfolder.reads=readspath, use.bamsignals=conf[['use.bamsignals']])
-    }, error = function(err) {
-      stop(file,'\n',err)
-    })
-  }
-}
-
-## Bin the files
-if (!file.exists(binpath.uncorrected)) { dir.create(binpath.uncorrected) }
-files <- list.files(inputfolder, full.names=TRUE, pattern='\\.bam$|\\.bed$|\\.bed\\.gz$')
-if (length(files) == 1 & conf[['cluster.plots']] == TRUE) {
-  conf[['cluster.plots']] <- FALSE
-  warning("Need more than one file for cluster.plots=TRUE. Continuing with cluster.plots=FALSE.")
-}
-if (numcpu > 1) {
-  ptm <- startTimedMessage("Binning the data ...")
-  temp <- foreach (file = files, .packages=c("AneuFinder")) %dopar% {
-    parallel.helper(file)
-  }
-  stopTimedMessage(ptm)
-} else {
-  # temp <- foreach (file = files, .packages=c("AneuFinder")) %do% {
-  for (file in files) {
-    parallel.helper(file)
-  }
-}
-  
-### Read fragments that are not produced yet ###
-if (!conf[['use.bamsignals']] & conf[['reads.store']]) {
-  parallel.helper <- function(file) {
-    savename <- file.path(readspath,paste0(basename(file),'.RData'))
-    if (!file.exists(savename)) {
-      tC <- tryCatch({
-        binReads(file=file, assembly=chrom.lengths.df, pairedEndReads=conf[['pairedEndReads']], chromosomes=conf[['chromosomes']], remove.duplicate.reads=conf[['remove.duplicate.reads']], min.mapq=conf[['min.mapq']], blacklist=conf[['blacklist']], calc.complexity=FALSE, reads.store=TRUE, outputfolder.reads=readspath, reads.only=TRUE)
-      }, error = function(err) {
-        stop(file,'\n',err)
-      })
+####### CHANGE FORMAT TO PREVIOUS ###########################################################################################
+    
+    # ID                -- same --
+    # bins              -- same --
+    # bincounts         has some extra columns ('state' and 'copy.number')  (artificially added)
+    # qualityInfo       complexity is missing
+    # segments          added 'num.bins' dropped 'GC' (This was an average of bins which does not make sense to me.)
+    # weights           -- same --
+    # distributions     -- same --
+    # warnings          -- same --
+    # breakpoints       to be added in next steps!!!
+    
+    model$bincounts     <- GRangesList()
+    model$bincounts[[1]] <- model$bins
+    
+####### CONTINUE ############################################################################################################
+    
+    # Breakpoints and confidence intervals
+    if (is.null(conf[['confint']])) {
+      reads.file        <- NULL
+    }else{
+      reads.file        <- file.path(readspath, paste0(model$ID,'.RData'))
     }
+    model$breakpoints <- getBreakpoints(model, fragments=reads.file, confint = conf[['confint']])
+    model$qualityInfo <- as.list(getQC(model))
+    save(model,file=file.path(path.method,basename(file.cur)))
   }
-  
-  if (numcpu > 1) {
-    ptm <- startTimedMessage("Saving reads as .RData ...")
-    temp <- foreach (file = files, .packages=c("AneuFinder")) %dopar% {
-      parallel.helper(file)
-    }
-    stopTimedMessage(ptm)
-  } else {
-    # temp <- foreach (file = files, .packages=c("AneuFinder")) %do% {
-    for (file in files) {
-      parallel.helper(file)
-    }
-  }
-  
-  ### Export read fragments as browser file ###
-  if (!file.exists(readsbrowserpath)) { dir.create(readsbrowserpath, recursive=TRUE) }
-  readfiles <- list.files(readspath,pattern='.RData$',full.names=TRUE)
-  
-  parallel.helper <- function(file) {
-    savename <- file.path(readsbrowserpath,sub('.RData','',basename(file)))
-    if (!file.exists(paste0(savename,'.bed.gz'))) {
-      tC <- tryCatch({
-        gr <- loadFromFiles(file, check.class='GRanges')[[1]]
-        exportGRanges(gr, filename=savename, trackname=basename(savename), score=gr$mapq)
-      }, error = function(err) {
-        stop(file,'\n',err)
-      })
-    }
-  }
-  
-  if (numcpu > 1) {
-    ptm <- startTimedMessage("Exporting data as browser files ...")
-    temp <- foreach (file = readfiles, .packages=c("AneuFinder")) %dopar% {
-      parallel.helper(file)
-    }
-    stopTimedMessage(ptm)
-  } else {
-    # temp <- foreach (file = readfiles, .packages=c("AneuFinder")) %do% {
-    for (file in readfiles) {
-      parallel.helper(file)
-    }
-  }
-}
-
-#=================
-### Correction ###
-#=================
-if (!is.null(conf[['correction.method']])) {
-
-  binpath.corrected <- binpath.uncorrected
-  for (correction.method in conf[['correction.method']]) {
-    binpath.corrected <- paste0(binpath.corrected, '-', correction.method)
-    if (!file.exists(binpath.corrected)) { dir.create(binpath.corrected) }
-
-    if (correction.method=='GC') {
-      ## Load BSgenome
-      if (class(conf[['GC.BSgenome']])!='BSgenome') {
-        if (is.character(conf[['GC.BSgenome']])) {
-          suppressPackageStartupMessages(library(conf[['GC.BSgenome']], character.only=TRUE))
-          conf[['GC.BSgenome']] <- as.object(conf[['GC.BSgenome']]) # replacing string by object
-        }
-      }
-
-      ## Go through patterns
-      parallel.helper <- function(pattern) {
-        binfiles <- list.files(binpath.uncorrected, pattern='RData$', full.names=TRUE)
-        binfiles <- grep(gsub('\\+','\\\\+',pattern), binfiles, value=TRUE)
-        binfiles.corrected <- list.files(binpath.corrected, pattern='RData$', full.names=TRUE)
-        binfiles.corrected <- grep(gsub('\\+','\\\\+',pattern), binfiles.corrected, value=TRUE)
-        binfiles.todo <- setdiff(basename(binfiles), basename(binfiles.corrected))
-        if (length(binfiles.todo)>0) {
-          binfiles.todo <- paste0(binpath.uncorrected,.Platform$file.sep,binfiles.todo)
-          if (grepl('binsize',gsub('\\+','\\\\+',pattern))) {
-            binned.data.list <- suppressMessages(correctGC(binfiles.todo,conf[['GC.BSgenome']], same.binsize=TRUE))
-          } else {
-            binned.data.list <- suppressMessages(correctGC(binfiles.todo,conf[['GC.BSgenome']], same.binsize=FALSE))
-          }
-          for (i1 in 1:length(binned.data.list)) {
-            binned.data <- binned.data.list[[i1]]
-            savename <- file.path(binpath.corrected, basename(names(binned.data.list)[i1]))
-            save(binned.data, file=savename)
-          }
-        }
-      }
-      if (numcpu > 1) {
-        ptm <- startTimedMessage(paste0(correction.method," correction ..."))
-        temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %dopar% {
-          parallel.helper(pattern)
-        }
-        stopTimedMessage(ptm)
-      } else {
-        ptm <- startTimedMessage(paste0(correction.method," correction ..."))
-        # temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %do% {
-        for (pattern in patterns) {
-          parallel.helper(pattern)
-        }
-        stopTimedMessage(ptm)
-      }
-    }
-
-  }
-  binpath <- binpath.corrected
-
-} else {
-  binpath <- binpath.uncorrected
-}
 
 
-#===============
-### findCNVs ###
-#===============
-for (method in conf[['method']]) {
 
     modeldir <- file.path(modelpath, paste0('method-', method))
-    if (!file.exists(modeldir)) { dir.create(modeldir, recursive=TRUE) }
     if (conf[['refine.breakpoints']]) {
         refinedmodeldir <- file.path(refinedmodelpath, paste0('method-', method))
         if (!file.exists(refinedmodeldir)) { dir.create(refinedmodeldir, recursive=TRUE) }
     } else {
         refinedmodeldir <- modeldir
     }
+
     plotdir <- file.path(plotpath, paste0('method-', method))
     if (!file.exists(plotdir)) { dir.create(plotdir, recursive=TRUE) }
+    
     browserdir <- file.path(browserpath, paste0('method-', method))
     if (!file.exists(browserdir)) { dir.create(browserdir, recursive=TRUE) }
-  
-    files <- list.files(binpath, full.names=TRUE, pattern='.RData$')
-    files <- grep(paste(gsub('\\+','\\\\+',patterns), collapse = '|'), files, value=TRUE)
-    
-    parallel.helper <- function(file) {
-        tC <- tryCatch({
-            savename <- file.path(modeldir,basename(file))
-            if (!file.exists(savename)) {
-                if (conf[['strandseq']]) {
-                    findCNV <- findCNVs.strandseq
-                } else {
-                    findCNV <- findCNVs
-                }
-                if (method == 'dnacopy') {
-                    model <- findCNV(file, method='dnacopy') 
-                } else if (method == 'HMM') {
-                    model <- findCNV(file, method='HMM', eps=conf[['eps']], max.time=conf[['max.time']], max.iter=conf[['max.iter']], num.trials=conf[['num.trials']], states=conf[['states']]) 
-                } else if (method == 'edivisive') {
-                    model <- findCNV(file, method='edivisive', R=conf[['R']], sig.lvl=conf[['sig.lvl']]) 
-                }
-                # Breakpoints and confidence intervals
-                if (is.null(conf[['confint']])) {
-                    reads.file <- NULL
-                } else {
-                    reads.file <- file.path(readspath, paste0(model$ID,'.RData'))
-                }
-                model$breakpoints <- getBreakpoints(model, fragments=reads.file, confint = conf[['confint']])
-                ptm <- startTimedMessage("Saving to file ",savename," ...")
-                save(model, file=savename)
-                stopTimedMessage(ptm)
-            }
-        }, error = function(err) {
-          stop(file,'\n',err)
-        })
-    }
-    if (numcpu > 1) {
-        if (method == 'dnacopy') {
-            ptm <- startTimedMessage("Running DNAcopy ...")
-        } else if (method == 'HMM') {
-            ptm <- startTimedMessage("Running HMMs ...")
-        } else if (method == 'edivisive') {
-            ptm <- startTimedMessage("Running edivisive ...")
-        }
-        temp <- foreach (file = files, .packages=c("AneuFinder")) %dopar% {
-            parallel.helper(file)
-        }
-        stopTimedMessage(ptm)
-      } else {
-          # temp <- foreach (file = files, .packages=c("AneuFinder")) %do% {
-          for (file in files) {
-              parallel.helper(file)
-          }
-    }
-  
+
     #========================
     ### refineBreakpoints ###
     #========================
@@ -544,7 +694,7 @@ for (method in conf[['method']]) {
             for (file in ifiles) {
                 hmm <- suppressMessages( loadFromFiles(file)[[1]] )
                 breakpoints[[basename(file)]] <- hmm$breakpoints
-                total.read.count[basename(file)] <- hmm$qualityInfo$total.read.count
+                total.read.count[basename(file)] <- hmm$qualityInfo$total.read.count                                             # total.read.count is missing!!!!!
             }
             if (is.null(conf[['hotspot.bandwidth']])) {
                 bw <- sum(as.numeric(seqlengths(hmm$bins))) / mean(total.read.count)
@@ -676,7 +826,7 @@ for (method in conf[['method']]) {
       temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %dopar% {
         parallel.helper(pattern)
       }
-      stopTimedMessage(ptm)
+     stopTimedMessage(ptm)
     } else {
       # temp <- foreach (pattern = patterns, .packages=c("AneuFinder")) %do% {
       for (pattern in patterns) {
@@ -757,9 +907,28 @@ for (method in conf[['method']]) {
       stopTimedMessage(ptm)
     }
 
-}
+  }
 
-total.time <- proc.time() - total.time
-message("==> Total time spent: ", round(total.time[3]), "s <==")
 
-}
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 3.02 | REFINE BREAKPOINTS
+# ---------------------------------------------------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PART 3.03 | FIND BREAKPOINT HOTSPOTS
+# ---------------------------------------------------------------------------------------------------------------------
+
+
+
+# =====================================================================================================================
+# PART 4 OF 4 | CREATING BROWSER FILES, PLOTTING
+# =====================================================================================================================
+
+}                                                                                                                      # N: End of function.
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# END END END END END END END END END END END END END END END END END END END END END END END END END END END END END 
+# ---------------------------------------------------------------------------------------------------------------------
