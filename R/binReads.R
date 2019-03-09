@@ -1,36 +1,17 @@
+binReads <- function(reads, bins) {
+    reads.plus <- reads[strand(reads) == '+']
+    reads.minus <- reads[strand(reads) == '-']
+    reads.star <- reads[strand(reads) == '*']
 
-# ---------------------------------------------------------------------------------------------------------------------
-#                                                      binReads
-# ---------------------------------------------------------------------------------------------------------------------
-# Organization:  ERIBA (CRIPSR/iPSC facility)
-# Programmer:    René Wardenaar (Original code written by Aaron Taudt)
-# Starting date: 24-09-18
-# Last modified: 06-03-19
-# Version:       1.0
-# ---------------------------------------------------------------------------------------------------------------------
+    scounts <- suppressWarnings(GenomicRanges::countOverlaps(bins, reads.star))
+    mcounts <- suppressWarnings(GenomicRanges::countOverlaps(bins, reads.minus))
+    pcounts <- suppressWarnings(GenomicRanges::countOverlaps(bins, reads.plus))
 
+    counts <- mcounts + pcounts + scounts
+    countmatrix <- matrix(c(counts,mcounts,pcounts), ncol=3)
+    colnames(countmatrix) <- c('counts','mcounts','pcounts')
 
-# ---------------------------------------------------------------------------------------------------------------------
-#                                                     Functions
-# ---------------------------------------------------------------------------------------------------------------------
-
-RW_binReads <- function(reads, bins){
-  reads.plus            <- reads[strand(reads)=='+']
-  reads.minus           <- reads[strand(reads)=='-']
-  reads.star            <- reads[strand(reads)=='*']
-  scounts               <- suppressWarnings(GenomicRanges::countOverlaps(bins,reads.star))
-  mcounts               <- suppressWarnings(GenomicRanges::countOverlaps(bins,reads.minus))
-  pcounts               <- suppressWarnings(GenomicRanges::countOverlaps(bins,reads.plus))
-  counts                <- mcounts + pcounts + scounts
-  countmatrix           <- matrix(c(counts,mcounts,pcounts), ncol=3)
-  colnames(countmatrix) <- c('counts','mcounts','pcounts')
-  mcols(bins)           <- as(countmatrix, 'DataFrame')
-  attr(bins, 'ID')      <- attr(reads, 'ID')
-  return(bins)
+    mcols(bins) <- as(countmatrix, 'DataFrame')
+    attr(bins, 'ID') <- attr(reads, 'ID')
+    bins
 }
-
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# END END END END END END END END END END END END END END END END END END END END END END END END END END END END END 
-# ---------------------------------------------------------------------------------------------------------------------
