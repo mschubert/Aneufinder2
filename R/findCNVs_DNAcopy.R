@@ -1,3 +1,18 @@
+#' Find copy number variations (DNAcopy, univariate)
+#'
+#' \code{DNAcopy.findCNVs} classifies the binned read counts into several
+#' states which represent copy-number-variation.
+#'
+#' @param binned.data A \link{GRanges-class} object with binned read counts.
+#' @param ID An identifier that will be used to identify this sample in various
+#'   downstream functions. Could be the file name of the \code{binned.data} for
+#'   example.
+#' @param CNgrid.start Start parameter for the CNgrid variable. Very empiric.
+#'   Set to 1.5 for normal data and 0.5 for Strand-seq data.
+#' @param strand Find copy-numbers only for the specified strand. One of
+#'   \code{c('+', '-', '*')}.
+#' @return An \code{\link{aneuHMM}} object.
+#' @importFrom DNAcopy CNA smooth.CNA
 DNAcopy.findCNVs <- function(binned.data, ID=NULL, CNgrid.start=1.5,
                              strand='*') {
 

@@ -1,3 +1,12 @@
+#' Find copy number variations (edivisive, bivariate)
+#'
+#' Classify the binned read counts into several states which represent
+#' copy-number-variation. The function uses the \code{\link{e.divisive}}
+#' function to segment the genome.
+#'
+#' @inheritParams edivisive.findCNVs
+#' @return An \code{\link{aneuHMM}} object.
+#' @importFrom ecp e.divisive
 bi.edivisive.findCNVs <- function(binned.data, ID=NULL, CNgrid.start=0.5, R=10,
                                   sig.lvl=0.1) {
 

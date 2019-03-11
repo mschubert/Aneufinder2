@@ -1,3 +1,25 @@
+#' Find copy number variations (edivisive, univariate)
+#'
+#' Classify the binned read counts into several states which represent
+#' copy-number-variation. The function uses the \code{\link{e.divisive}}
+#' function to segment the genome.
+#'
+#' @param binned.data A \link{GRanges-class} object with binned read counts.
+#' @param ID An identifier that will be used to identify this sample in various
+#'   downstream functions. Could be the file name of the \code{binned.data} for
+#'   example.
+#' @param CNgrid.start Start parameter for the CNgrid variable. Very empiric.
+#'   Set to 1.5 for normal data and 0.5 for Strand-seq data.
+#' @param strand Find copy-numbers only for the specified strand. One of
+#'   \code{c('+', '-', '*')}.
+#' @param R method-edivisive: The maximum number of random permutations to use
+#'   in each iteration of the permutation test (see \code{\link[ecp]{e.divisive}}).
+#'   Increase this value to increase accuracy on the cost of speed.
+#' @param sig.lvl method-edivisive: The level at which to sequentially test if
+#'   a proposed change point is statistically significant (see
+#'   \code{\link[ecp]{e.divisive}}). Increase this value to find more breakpoints.
+#' @return An \code{\link{aneuHMM}} object.
+#' @importFrom ecp e.divisive
 edivisive.findCNVs <- function(binned.data, ID=NULL, CNgrid.start=1.5,
                                strand='*', R=10, sig.lvl=0.1) {
 

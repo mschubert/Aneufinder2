@@ -1,3 +1,12 @@
+#' Find copy number variations (bivariate)
+#'
+#' \code{biHMM.findCNVs} finds CNVs using read count information from both
+#' strands.
+#'
+#' @inheritParams HMM.findCNVs
+#' @inheritParams findCNVs
+#' @return An \code{\link{aneuBiHMM}} object.
+#' @importFrom stats pgeom pnbinom qnorm
 biHMM.findCNVs <- function(binned.data, ID=NULL, eps=0.01, init="standard",
                            max.time=-1, max.iter=-1, num.trials=1,
                            eps.try=NULL, num.threads=1,

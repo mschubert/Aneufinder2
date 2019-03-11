@@ -1,4 +1,63 @@
-# GET THE COUNTS AND CHECK THE DATA
+#' Find copy number variations (univariate)
+#'
+#' \code{HMM.findCNVs} classifies the binned read counts into several states
+#' which represent copy-number-variation.
+#'
+#' @param binned.data A \code{\link{GRanges-class}} object with binned read
+#'   counts. Alternatively a \code{\link{GRangesList}} object with offsetted
+#'   read counts.
+#' @param ID An identifier that will be used to identify this sample in various
+#'   downstream functions. Could be the file name of the \code{binned.data} for
+#'   example.
+#' @param eps method-HMM: Convergence threshold for the Baum-Welch algorithm.
+#' @param init method-HMM: One of the following initialization procedures:
+#'  \describe{
+#'    \item{\code{standard}}{The negative binomial of state '2-somy' will be
+#'      initialized with \code{mean=mean(counts)}, \code{var=var(counts)}. This
+#'      procedure usually gives good convergence.}
+#'    \item{\code{random}}{Mean and variance of the negative binomial of state
+#'     '2-somy' will be initialized with random values (in certain boundaries,
+#'     see source code). Try this if the \code{standard} procedure fails to
+#'     produce a good fit.}
+#'  }
+#' @param max.time method-HMM: The maximum running time in seconds for the
+#'   Baum-Welch algorithm. If this time is reached, the Baum-Welch will terminate
+#'   after the current iteration finishes. Set \code{max.time = -1} for no limit.
+#' @param max.iter method-HMM: The maximum number of iterations for the
+#'   Baum-Welch algorithm. Set \code{max.iter = -1} for no limit.
+#' @param num.trials method-HMM: The number of trials to find a fit where state
+#'   \code{most.frequent.state} is most frequent. Each time, the HMM is seeded
+#'   with different random initial values.
+#' @param eps.try method-HMM: If code num.trials is set to greater than 1,
+#'   \code{eps.try} is used for the trial runs. If unset, \code{eps} is used.
+#' @param num.threads method-HMM: Number of threads to use. Setting this to >1
+#'   may give increased performance.
+#' @param count.cutoff.quantile method-HMM: A quantile between 0 and 1. Should
+#'   be near 1. Read counts above this quantile will be set to the read count
+#'   specified by this quantile. Filtering very high read counts increases the
+#'   performance of the Baum-Welch fitting procedure. However, if your data
+#'   contains very few peaks they might be filtered out. Set
+#'   \code{count.cutoff.quantile=1} in this case.
+#' @param strand Find copy-numbers only for the specified strand. One of
+#'   \code{c('+', '-', '*')}.
+#' @param states method-HMM: A subset or all of
+#'   \code{c("zero-inflation","0-somy","1-somy","2-somy","3-somy","4-somy",...)}.
+#'   This vector defines the states that are used in the Hidden Markov Model.
+#'   The order of the entries must not be changed.
+#' @param most.frequent.state method-HMM: One of the states that were given in
+#'   \code{states}. The specified state is assumed to be the most frequent one.
+#'   This can help the fitting procedure to converge into the correct fit.
+#' @param algorithm method-HMM: One of \code{c('baumWelch','EM')}. The
+#'   expectation maximization (\code{'EM'}) will find the most likely states and
+#'   fit the best parameters to the data, the \code{'baumWelch'} will find the
+#'   most likely states using the initial parameters.
+#' @param initial.params method-HMM: A \code{\link{aneuHMM}} object or file
+#'   containing such an object from which initial starting parameters will be
+#'   extracted.
+#' @param verbosity method-HMM: Integer specifying the verbosity of printed
+#'   messages.
+#' @return An \code{\link{aneuHMM}} object.
+#' @importFrom stats runif
 HMM.findCNVs <- function(binned.data, ID=NULL, eps=0.01, init="standard",
                          max.time=-1, max.iter=-1, num.trials=1, eps.try=NULL,
                          num.threads=1, count.cutoff.quantile=0.999,
