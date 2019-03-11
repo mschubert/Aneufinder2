@@ -270,21 +270,23 @@ biHMM.findCNVs <- function(binned.data, ID=NULL, eps=0.01, init="standard",
         return(result)
     }
 
-    result                <- list(ID=ID, bins=binned.data)
-    matrix.states         <- do.call("rbind",strsplit(as.character(comb.states[hmm$states]),split=' '))
-    mstate.num            <- sub("zero-inflation","0-somy",matrix.states[,1])
-    mstate.num            <- as.numeric(sub("-somy", "", mstate.num))
-    pstate.num            <- sub("zero-inflation","0-somy",matrix.states[,2])
-    pstate.num            <- as.numeric(sub("-somy", "", pstate.num))
-    bs.copy.num           <- mstate.num + pstate.num
-    bs.state              <- paste0(bs.copy.num,"-somy")
-    result$bins$state     <- factor(bs.state, levels=unique(c(states,sort(unique(bs.state)))))
-    result$bins$mstate    <- factor(matrix.states[,1], levels=uni.states)
-    result$bins$pstate    <- factor(matrix.states[,2], levels=uni.states)
-    result$bins$copy.number <- bs.copy.num
-    result$bins$mcopy.number <- mstate.num
-    result$bins$pcopy.number <- pstate.num
-    result$bins$combi     <- paste(result$bins$mcopy.number, result$bins$pcopy.number)
+    result        <- list(ID=ID, bins=binned.data)
+    matrix.states <- do.call("rbind",strsplit(as.character(comb.states[hmm$states]),split=' '))
+    mstate.num    <- sub("zero-inflation","0-somy",matrix.states[,1])
+    mstate.num    <- as.numeric(sub("-somy", "", mstate.num))
+    pstate.num    <- sub("zero-inflation","0-somy",matrix.states[,2])
+    pstate.num    <- as.numeric(sub("-somy", "", pstate.num))
+    bs.copy.num   <- mstate.num + pstate.num
+    bs.state      <- paste0(bs.copy.num,"-somy")
+    with(result$bins,
+        state <- factor(bs.state, levels=unique(c(states,sort(unique(bs.state)))))
+        mstate <- factor(matrix.states[,1], levels=uni.states)
+        pstate <- factor(matrix.states[,2], levels=uni.states)
+        copy.number <- bs.copy.num
+        mcopy.number <- mstate.num
+        pcopy.number <- pstate.num
+        combi <- paste(result$bins$mcopy.number, result$bins$pcopy.number)
+    )
     suppressMessages(result$segments <-
         as(collapseBins(as.data.frame(result$bins),
                         column2collapseBy = 'combi',
