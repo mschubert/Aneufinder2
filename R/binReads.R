@@ -18,17 +18,13 @@ binReads.character <- function(reads, bins) {
 }
 
 binReads.GRanges <- function(reads, bins) {
-    reads.plus <- reads[GenomicRanges::strand(reads) == '+']
-    reads.minus <- reads[GenomicRanges::strand(reads) == '-']
-    reads.star <- reads[GenomicRanges::strand(reads) == '*']
+    reads <- split(reads, GenomicRanges::strand(reads))
+    counts <- lapply(reads, function(r)
+                     suppressWarnings(GenomicRanges::countOverlaps(bins, r)))
 
-    scounts <- suppressWarnings(GenomicRanges::countOverlaps(bins, reads.star))
-    mcounts <- suppressWarnings(GenomicRanges::countOverlaps(bins, reads.minus))
-    pcounts <- suppressWarnings(GenomicRanges::countOverlaps(bins, reads.plus))
-
-    mcols(bins) <- S4Vectors::DataFrame(counts = mcounts + pcounts + scounts,
-                                        mcounts = mcounts,
-                                        pcounts = pcounts)
+    mcols(bins) <- S4Vectors::DataFrame(counts = Reduce(`+`, counts),
+                                        mcounts = counts$`-`,
+                                        pcounts = counts$`+`)
 
     attr(bins, 'ID') <- attr(reads, 'ID')
     bins
