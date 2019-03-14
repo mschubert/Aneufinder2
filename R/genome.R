@@ -5,10 +5,11 @@ genome <- function(x, ...) {
 genome.character <- function(x, ...) {
     if (length(x) > 1)
         stop("Can only get genome information for one object at a time")
+
     if (file.exists(x) && grepl("\\.bam$", x))
         genome(Rsamtools::BamFile(x), ...)
-
-    #TODO: get seqinfo object from assembly identifier
+    else
+        genome(GenomeInfoDb::fetchExtendedChromInfoFromUCSC(x), ...)
 }
 
 genome.GRanges <- function(x, ...) {
@@ -21,8 +22,12 @@ genome.BamFile <- function(x, ...) {
     seqinfo(seqinfo, ...)
 }
 
-genome.seqinfo <- function(x, ...) {
-    #TODO: remove nonstandard chromosomes by default
+genome.seqinfo <- function(x, chrs=NULL) {
+    if (is.null(chrs)) {
+        chrs = GenomeInfoDb::standardChromosomes(x)
+        chrs = grep("^(chr)?[YM]$", chrs, invert=TRUE, value=TRUE)
+    }
+    GenomeInfoDb::keepSeqlevels(x, chrs, pruning.mode="coarse")
 }
 
 genome.default <- function(x, ...) {
