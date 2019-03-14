@@ -60,7 +60,7 @@ readGRanges.BamFile <- function(x, ..., seqinfo=GenomeInfoDb::seqinfo(x)) {
 }
 
 readGRanges.BedFile <- function(x, ..., seqinfo) {
-    ptm <- startTimedMessage("Reading file ", basename(x)," ...")
+    ptm <- startTimedMessage("Reading file ", basename(x), " ...")
     ccs <- c('character', 'numeric', 'numeric', 'NULL', 'integer', 'character')
     data.raw <- utils::read.table(bedfile, colClasses=ccs)
     data <- GenomicRanges::GRanges(
