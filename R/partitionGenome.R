@@ -1,12 +1,12 @@
 #' Partition the genome into bins
 #'
 #' @param variableWidthReference
-binGenome <- function(seqinfo, bin.size=1e6, reads.per.bin=NULL, stepsize=NULL,
+partitionGenome <- function(seqinfo, bin.size=1e6, reads.per.bin=NULL, stepsize=NULL,
                       variable.ref=NULL) {
-    UseMethod("binGenome")
+    UseMethod("partitionGenome")
 }
 
-binGenome.seqinfo <- function(seqinfo=genome(varable.ref), bin.size=1e6,
+partitionGenome.seqinfo <- function(seqinfo=genome(varable.ref), bin.size=1e6,
                               stepsize=NULL, variable.ref=NULL) {
 
     if (is.null(variable.ref)) {
@@ -30,10 +30,10 @@ binGenome.seqinfo <- function(seqinfo=genome(varable.ref), bin.size=1e6,
     }
 }
 
-binGenome.character <- function(seqinfo, ...) {
-    binGenome(genome(x), ...)
+partitionGenome.character <- function(seqinfo, ...) {
+    partitionGenome(genome(x), ...)
 }
 
-binGenome.default <- function(x, ...) {
+partitionGenome.default <- function(x, ...) {
     stop("Do not know how to create bins from object type ", sQuote(class(x)))
 }
