@@ -10,7 +10,7 @@ partitionGenome.seqinfo <- function(seqinfo=genome(varable.ref), bin.size=1e6,
                               stepsize=NULL, variable.ref=NULL) {
 
     if (is.null(variable.ref)) {
-        chr.len = GenomeInfoDB::seqlengths(seqinfo)
+        chr.len = GenomeInfoDb::seqlengths(seqinfo)
         if (stepsize == binsize) { # non-overlapping bins
             chr.len.floor <- floor(chr.len / binsize) * binsize
         } else if (stepsize < binsize) { # overlapping bins

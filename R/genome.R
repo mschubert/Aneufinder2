@@ -12,12 +12,12 @@ genome.character <- function(x, ...) {
 }
 
 genome.GRanges <- function(x, ...) {
-    seqinfo <- GenomeInfoDB::seqinfo(x)
+    seqinfo <- GenomeInfoDb::seqinfo(x)
     genome(seqinfo, ...)
 }
 
 genome.BamFile <- function(x, ...) {
-    seqinfo <- GenomeInfoDB::seqinfo(x)
+    seqinfo <- GenomeInfoDb::seqinfo(x)
     seqinfo(seqinfo, ...)
 }
 
