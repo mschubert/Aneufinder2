@@ -1,4 +1,8 @@
-readConfig <- function(configfile) {
+readConfig <- function(configfile=NULL) {
+    if (is.null(configfile))
+        return(list())
+
+    #TODO: add error handling here
     config <- utils::read.table(configfile, sep="=", fill=TRUE,
                                 row.names=NULL, header=FALSE, quote="")
 
@@ -12,6 +16,7 @@ readConfig <- function(configfile) {
 
     configlist <- list() # Turn into config list
     ToParse <- paste0("configlist$", config$argument, " <- ", config$value)
+
     eval(parse(text=ToParse))
     configlist
 }
