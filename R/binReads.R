@@ -1,3 +1,4 @@
+#TODO: check same genome
 binReads <- function(reads, bins) {
     UseMethod("binReads")
 }
@@ -14,7 +15,11 @@ binReads.character <- function(reads, bins) {
     }
 
     names(reads) = tools::file_path_sans_ext(basename(reads))
-    binReads(as.list(reads))
+
+    if (length(reads) > 1)
+        binReads(as.list(reads), bins)
+    else
+        bin_one(reads, bins)
 }
 
 binReads.GRanges <- function(reads, bins) {

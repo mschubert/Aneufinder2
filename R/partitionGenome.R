@@ -1,15 +1,15 @@
 #' Partition the genome into bins
 #'
 #' @param variableWidthReference
-partitionGenome <- function(seqinfo, bin.size=1e6, reads.per.bin=NULL, stepsize=NULL,
-                      variable.ref=NULL) {
+partitionGenome <- function(seqinfo, bin.size=1e6, reads.per.bin=NULL,
+                            stepsize=NULL, variable.width.ref=NULL) {
     UseMethod("partitionGenome")
 }
 
-partitionGenome.seqinfo <- function(seqinfo=genome(varable.ref), bin.size=1e6,
-                              stepsize=NULL, variable.ref=NULL) {
+partitionGenome.seqinfo <- function(seqinfo=genome(variable.width.ref), bin.size=1e6,
+                              stepsize=NULL, variable.width.ref=NULL) {
 
-    if (is.null(variable.ref)) {
+    if (is.null(variable.width.ref)) { # fixed-size bins
         chr.len = GenomeInfoDb::seqlengths(seqinfo)
         if (stepsize == binsize) { # non-overlapping bins
             chr.len.floor <- floor(chr.len / binsize) * binsize
@@ -19,12 +19,13 @@ partitionGenome.seqinfo <- function(seqinfo=genome(varable.ref), bin.size=1e6,
             chr.len.floor <- pmax(chr.len.floor, 0)
         }
 
-        bins <- unlist(GenomicRanges::tileGenome(seqlengths=chr.len.floor,
-                                                 tilewidth=stepsize), use.names=FALSE)
+        bins <- GenomicRanges::tileGenome(seqlengths=chr.len.floor, tilewidth=stepsize)
+        bins <- unlist(bins, use.names=FALSE)
 
-        if (stepsize < binsize)
+        if (stepsize < binsize) #FIXME: shouldn't we do this regardless?
             end(bins) <- (start(bins) + binsize - 1)
-    } else {
+
+    } else { # variable bins
         stop("not implemented")
         #TODO: handle variable width ref
     }

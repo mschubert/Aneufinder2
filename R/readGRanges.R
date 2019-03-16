@@ -19,7 +19,7 @@ readGRanges.character <- function(x, ...) {
 
 readGRanges.BamFile <- function(x, ..., seqinfo=GenomeInfoDb::seqinfo(x)) {
     if (!file.exists(paste0(x, ".bai"))) {
-        ptm <- startTimedMessage("Couldn't find BAM index-file, creating one.")
+        ptm <- startTimedMessage("Couldn't find BAM index file, creating one.")
         Rsamtools::indexBam(x)
         stopTimedMessage(ptm)
     }
