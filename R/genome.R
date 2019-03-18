@@ -25,7 +25,7 @@ genome.BamFile <- function(x, ...) {
 genome.Seqinfo <- function(x, chrs=NULL) {
     if (is.null(chrs)) {
         chrs = GenomeInfoDb::standardChromosomes(x)
-        chrs = grep("^(chr)?(Y|MT)$", chrs, invert=TRUE, value=TRUE)
+        chrs = grep("^(chr)?(Y|M(T)?)$", chrs, invert=TRUE, value=TRUE)
     }
     GenomeInfoDb::keepSeqlevels(x, chrs)
 }
