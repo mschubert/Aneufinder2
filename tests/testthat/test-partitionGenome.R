@@ -1,4 +1,4 @@
-context("parition genome")
+context("partition genome")
 
 test_that("fixed width bins", {
     genome = genome("mm10")
@@ -9,8 +9,8 @@ test_that("fixed width bins", {
     expect_setequal(as.character(GenomeInfoDb::seqnames(bins)), names(genome))
 })
 
-#test_that("variable width bins", {
-#})
+test_that("variable width bins", {
+})
 
-#test_that("error on genome mismatch", {
-#})
+test_that("error on genome mismatch", {
+})

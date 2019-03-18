@@ -279,12 +279,12 @@ biHMM.findCNVs <- function(binned.data, ID=NULL, eps=0.01, init="standard",
     bs.copy.num   <- mstate.num + pstate.num
     bs.state      <- paste0(bs.copy.num,"-somy")
     with(result$bins,
-        state <- factor(bs.state, levels=unique(c(states,sort(unique(bs.state)))))
-        mstate <- factor(matrix.states[,1], levels=uni.states)
-        pstate <- factor(matrix.states[,2], levels=uni.states)
-        copy.number <- bs.copy.num
-        mcopy.number <- mstate.num
-        pcopy.number <- pstate.num
+        state <- factor(bs.state, levels=unique(c(states,sort(unique(bs.state))))),
+        mstate <- factor(matrix.states[,1], levels=uni.states),
+        pstate <- factor(matrix.states[,2], levels=uni.states),
+        copy.number <- bs.copy.num,
+        mcopy.number <- mstate.num,
+        pcopy.number <- pstate.num,
         combi <- paste(result$bins$mcopy.number, result$bins$pcopy.number)
     )
     suppressMessages(result$segments <-
