@@ -1,36 +1,39 @@
 #' Partition the genome into bins
 #'
 #' @param variableWidthReference
-partitionGenome <- function(seqinfo, bin.size=1e6, reads.per.bin=NULL,
+partitionGenome <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
                             stepsize=NULL) {
     UseMethod("partitionGenome")
 }
 
-partitionGenome.Seqinfo <- function(seqinfo, bin.size=1e6, stepsize=NULL) {
+partitionGenome.Seqinfo <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
+                                    stepsize=NULL) {
     if (is.null(stepsize))
-        stepsize <- bin.size
-    if (! (bin.size >= stepsize && bin.size %% stepsize == 0))
-        stop("bin.size must be a multiple of stepsize")
+        stepsize <- binsize
+    if (! (binsize >= stepsize && binsize %% stepsize == 0))
+        stop("binsize must be a multiple of stepsize")
 
     # fixed-size bins
     chr.len <- GenomeInfoDb::seqlengths(seqinfo)
     chr.len.floor <- floor(chr.len / stepsize) * stepsize
     # overlapping bins
-    if (stepsize < bin.size) {
-        chr.len.floor <- chr.len.floor - (bin.size/stepsize - 1) * stepsize
+    if (stepsize < binsize) {
+        chr.len.floor <- chr.len.floor - (binsize/stepsize - 1) * stepsize
         chr.len.floor <- pmax(chr.len.floor, 0)
     }
 
     bins <- GenomicRanges::tileGenome(seqlengths=chr.len.floor, tilewidth=stepsize)
     bins <- unlist(bins, use.names=FALSE)
-    if (stepsize < bin.size)
-        end(bins) <- (start(bins) + bin.size - 1)
+    if (stepsize < binsize)
+        end(bins) <- (start(bins) + binsize - 1)
 
     GenomeInfoDb::seqinfo(bins) <- seqinfo
     bins
 }
 
-partitionGenome.GRanges <- function(seqinfo, bin.size=1e6, stepsize=NULL) {
+#TODO: use custom class here for binned reads(?)
+partitionGenome.GRanges <- function(seqinfo, binsize=1e6,
+                                    reads.per.bin=NULL, stepsize=NULL) {
     stop("not implemented")
     # seqinfo = GRanges with counts from variable width ref?
     #  would need fixed bins + read counts from readGRanges(variable width ref)

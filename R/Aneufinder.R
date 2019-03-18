@@ -16,9 +16,9 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
 
     # load config params, but arguments take priority
     conf <- readConfig(configfile)
-    params <- match_call_defaults()
-    conf <- utils::modifyList(conf, params)
-    checkClass(conf=conf) # this is still too verbose
+    args <- lapply(as.list(match.call())[-1], eval, envir=parent.frame())
+    conf <- utils::modifyList(conf, args)
+#    checkClass(conf=conf) # this is still too verbose
     # ^^ also should check/set [most will be done in checkClass already]:
     #  binsize/stepsize is integer >= 1; one step size for each bin size
     #  reads.per.bin >= 1, integer
@@ -42,7 +42,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
         inputfolder <- list.files(inputfolder, "\\.(bam|bed(\\.gz)?)$", full.names=TRUE)
     if (length(inputfolder) == 0)
         stop("No BAM or BED files supplied or in directory")
-    names(inputfolder) <- tools::file_name_sans_ext(basename(inputfolder))
+    names(inputfolder) <- tools::file_path_sans_ext(basename(inputfolder))
 
     if (!file.exists(conf[['outputfolder']]))
         dir.create(conf[['outputfolder']])
@@ -50,8 +50,8 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     seqinfo <- genome(inputfolder[1])
     # provide a function to call(partitionGenome, conf) that matches args?
     #   also potentially combine with looking if results are there + skip (otherwise +save)
-    bins <- partitionGenome(seqinfo, bin.size=bin.size, reads.per.bin=reads.per.bin,
-                            stepsize=stepsize, variable.width.reference=variable.width.reference)
+    bins <- partitionGenome(seqinfo, binsize=binsizes,
+                            reads.per.bin=reads.per.bin, stepsize=stepsizes)
     # also calc (GC) correction factors here
 
     # check if the binned files are available first and load, or save otherwise
@@ -64,13 +64,20 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #  inp_file            <- basename(file.cur)
     #  inp_file            <- substr(inp_file,1,(nchar(inp_file)-6))
     #  file.save           <- file.path(path.uncorrected.bins,paste0(inp_file,"_",combi,".RData"))
-    reads <- binReads(inputfolder, bins) # ... for readGRanges opts
+    args <- conf[intersect(names(conf), names(formals(readGRanges)))]
+    args$reads <- inputfolder
+    args$bins <- bins
+    reads <- do.call(binReads, args)
     # also include number correction here (in separate mcols field)
 
     # reads: {output}/data
     # create {output}/MODELS{,_refined} /PLOTS /BROWSERFILES
     # save 
 
-    args <- conf[intersect(names(conf), formals(findCNVs))]
+    args <- conf[intersect(names(conf), names(formals(findCNVs)))]
+    args$binned <- reads
     model <- do.call(findCNVs, args)
+
+    #TODO: add plots, etc.
+    model
 }

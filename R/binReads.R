@@ -27,9 +27,10 @@ binReads.GRanges <- function(reads, bins) {
     counts <- lapply(reads, function(r)
                      suppressWarnings(GenomicRanges::countOverlaps(bins, r)))
 
-    mcols(bins) <- S4Vectors::DataFrame(counts = Reduce(`+`, counts),
-                                        mcounts = counts$`-`,
-                                        pcounts = counts$`+`)
+    counts <- S4Vectors::DataFrame(counts = Reduce(`+`, counts),
+                                   mcounts = counts$`-`,
+                                   pcounts = counts$`+`)
+    GenomicRanges::mcols(bins) <- counts
 
     attr(bins, 'ID') <- attr(reads, 'ID')
     bins

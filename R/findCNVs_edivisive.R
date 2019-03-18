@@ -20,6 +20,8 @@
 #'   \code{\link[ecp]{e.divisive}}). Increase this value to find more breakpoints.
 #' @return An \code{\link{aneuHMM}} object.
 #' @importFrom ecp e.divisive
+#' @importFrom GenomicRanges mcols mcols<-
+#' @importFrom GenomeInfoDb seqnames seqlevels seqlengths seqlevels<- seqlengths<-
 edivisive.findCNVs <- function(binned.data, ID=NULL, CNgrid.start=1.5,
                                strand='*', R=10, sig.lvl=0.1) {
 
