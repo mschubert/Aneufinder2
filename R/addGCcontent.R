@@ -10,6 +10,7 @@ addGCcontent.GRanges <- function(bins, BSgenome=NULL) {
         BSgenome <- grep(assembly, BSgenome::available.genomes(), value=TRUE)[1]
     }
     bs.genome <- getFromNamespace(BSgenome, ns=BSgenome)
+    seqlevelsStyle(bs.genome) <- seqlevelsStyle(bins)[1] # [NCBI], Ensembl
 
     # # this needs too much memory: https://support.bioconductor.org/p/89480/
     # views <- Biostrings::Views(bs.genome, bins)

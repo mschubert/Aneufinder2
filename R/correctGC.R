@@ -6,10 +6,10 @@ correctGC.GRanges <- function(reads, method='loess') {
     if (method == 'loess') {
         # check: use predict() here instead?
         fit <- stats::loess(counts ~ GC.content, data=as.data.frame(reads))
-        correction <- median(counts) / fit$fitted
-        reads$counts <- as.integer(round(counts * correction))
-        reads$mcounts <- as.integer(round(mcounts * correction))
-        reads$pcounts <- as.integer(round(pcounts * correction))
+        correction <- median(reads$counts) / fit$fitted
+        reads$counts <- as.integer(round(reads$counts * correction))
+        reads$mcounts <- as.integer(round(reads$mcounts * correction))
+        reads$pcounts <- as.integer(round(reads$pcounts * correction))
     }
 
     reads

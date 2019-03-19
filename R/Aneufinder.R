@@ -52,6 +52,8 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     else
         seqinfo <- genome(assembly)
 
+    GenomeInfoDb::seqlevelsStyle(seqinfo) <- "NCBI" #TODO: integrate this
+
     # provide a function to call(partitionGenome, conf) that matches args?
     #   also potentially combine with looking if results are there + skip (otherwise +save)
     bins <- partitionGenome(seqinfo, binsize=binsizes,
@@ -79,7 +81,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     # save
 
     args <- conf[intersect(names(conf), names(formals(findCNVs)))]
-    model <- do.call(findCNVs, c(args), list(binned=reads))
+    model <- do.call(findCNVs, c(args, list(binned=reads)))
 
     #TODO: add plots, etc.
     model
