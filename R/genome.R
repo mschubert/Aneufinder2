@@ -8,8 +8,16 @@ genome.character <- function(x, ...) {
 
     if (file.exists(x) && grepl("\\.bam$", x))
         genome(Rsamtools::BamFile(x), ...)
-    else
-        genome(GenomeInfoDb::Seqinfo(genome=x), ...)
+    else {
+        lookup <- setNames(c("mm9", "mm10", "hg37", "hg38"),
+                           c("GRCm37", "GRCm38", "GRCh37", "GRCh38"))
+        adj <- identity
+        if (x %in% names(lookup)) {
+            adj <- function(x) { GenomeInfoDb::seqlevelsStyle(x) <- "NCBI"; x }
+            x <- lookup[[x]]
+        }
+        adj(genome(GenomeInfoDb::Seqinfo(genome=x), ...))
+    }
 }
 
 genome.GRanges <- function(x, ...) {
