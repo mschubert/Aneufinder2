@@ -72,15 +72,15 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     bin_reads <- function(x, dir=makedir(conf$outputfolder, "binned")) {
         fname <- args2fname(file.path(dir, basename(x)),
             binsize=binsizes, stepsize=stepsizes)
-        if (file.exists(fname) && conf$reuse.existing.files) {
-            reads <- readRDS(fname)
-        } else {
-            args <- conf[intersect(names(conf), names(formals(readGRanges)))]
-            reads <- do.call("binReads", c(args, list(reads=x, bins=bins)))
-            if ("GC" %in% correction.method)
-                reads <- correctGC(reads, method="loess")
-            saveRDS(reads, file=fname)
-        }
+        if (file.exists(fname) && conf$reuse.existing.files)
+            return(readRDS(fname))
+
+        args <- conf[intersect(names(conf), names(formals(readGRanges)))]
+        reads <- do.call("binReads", c(args, list(reads=x, bins=bins)))
+        if ("GC" %in% correction.method)
+            reads <- correctGC(reads, method="loess")
+        saveRDS(reads, file=fname)
+        reads
     }
     reads <- lapply(inputfolder, bin_reads)
 
@@ -89,15 +89,16 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     ###
     find_cnvs <- function(x, dir=makedir(conf$outputfolder, "MODELS")) {
         fname <- args2fname(file.path(dir, attr(x, 'ID')), method=method)
-        if (file.exists(fname) && conf$reuse.existing.files) {
-            models <- readRDS(fname)
-        } else {
-            args <- conf[intersect(names(conf), names(formals(findCNVs)))]
-            models <- do.call("findCNVs", c(args, list(binned=x)))
-            saveRDS(models, file=fname)
-        }
+        if (file.exists(fname) && conf$reuse.existing.files)
+            return(readRDS(fname))
+
+        args <- conf[intersect(names(conf), names(formals(findCNVs)))]
+        models <- do.call("findCNVs", c(args, list(binned=x)))
+        saveRDS(models, file=fname)
+        models
     }
-    models <- lapply(reads, find_cnvs) #FIXME: fails on first run
+    models <- lapply(reads, find_cnvs)
+    names(models) <- sapply(models, function(m) m$ID)
 
     ###
     ### Refine breakpoints, breakpoint hotspots
