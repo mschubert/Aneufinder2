@@ -28,7 +28,7 @@
 clusterHMMs <- function(hmms, cluster=TRUE, classes=NULL, exclude.regions=NULL) {
 
 	## Load the files
-	hmms <- loadFromFiles(hmms, check.class=c("aneuHMM", "aneuBiHMM"))
+#	hmms <- loadFromFiles(hmms, check.class=c("aneuHMM", "aneuBiHMM"))
 
 	## Only use HMMs where column 'copy.number' exists
 	ptm <- startTimedMessage("Checking column 'copy.number'  ...")

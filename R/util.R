@@ -59,3 +59,25 @@ stopTimedMessage <- function(ptm) {
     time <- proc.time() - ptm
     message(" ", round(time[3],2), "s")
 }
+
+args2fname <- function(base, ..., ext='.rds') {
+    fmt <- function(key, value) {
+        if (is.character(value))
+            paste(key, value, sep="_")
+        else
+            gsub("\\+0", "", sprintf("%s_%.2g", key, value))
+    }
+    args <- list(...)
+    if (length(args) > 0) {
+        fmtd <- paste(mapply(fmt, names(args), args), collapse="_")
+        sprintf("%s_%s%s", base, fmtd, ext)
+    } else
+        sprintf("%s%s", base, ext)
+}
+
+makedir <- function(...) {
+    path <- file.path(...)
+    if (!file.exists(path))
+        dir.create(path)
+    invisible(path)
+}

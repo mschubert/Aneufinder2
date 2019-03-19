@@ -752,7 +752,7 @@ heatmapGenomewide <- function(hmms, ylabels=NULL, classes=NULL, reorder.by.class
   }
 
     ## Load the files
-    hmms <- loadFromFiles(hmms, check.class=c("aneuHMM", "aneuBiHMM"))
+#    hmms <- loadFromFiles(hmms, check.class=c("aneuHMM", "aneuBiHMM"))
 
     ## Dataframe with IDs, ylabels and classes
     class.data <- data.frame(ID=sapply(hmms,'[[','ID'))

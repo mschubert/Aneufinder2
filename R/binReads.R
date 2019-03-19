@@ -4,10 +4,10 @@ binReads <- function(reads, bins) {
 }
 
 binReads.character <- function(reads, bins) {
-    if (length(reads) == 1 && dir.exists(reads)) {
+    if (length(reads) == 1 && dir.exists(reads))
         reads = list.files(reads, "\\.(bam|bed(\\.gz)?)$", full.names=TRUE)
-        message("Reading ", length(reads), " sequence files ...")
-    }
+    if (length(reads) == 0)
+        stop("No BAM or BED files supplied or in directory")
     names(reads) = tools::file_path_sans_ext(basename(reads))
 
     if (length(reads) > 1)
@@ -17,8 +17,8 @@ binReads.character <- function(reads, bins) {
 }
 
 binReads.GRanges <- function(reads, bins) {
-    reads <- split(reads, GenomicRanges::strand(reads))
-    clist <- lapply(reads, function(r)
+    strands <- split(reads, GenomicRanges::strand(reads))
+    clist <- lapply(strands, function(r)
                     suppressWarnings(GenomicRanges::countOverlaps(bins, r)))
 
     bins$counts <- Reduce(`+`, clist)
@@ -30,7 +30,8 @@ binReads.GRanges <- function(reads, bins) {
 }
 
 binReads.list <- function(reads, bins) {
-    lapply(reads, binReads)
+    message("Reading ", length(reads), " sequence files ...")
+    lapply(reads, binReads, bins=bins)
 }
 
 binReads.default <- function(reads, bins) {

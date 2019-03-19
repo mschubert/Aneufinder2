@@ -18,6 +18,8 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     conf <- readConfig(configfile)
     args <- lapply(as.list(match.call())[-1], eval, envir=parent.frame())
     conf <- utils::modifyList(conf, args)
+    conf$reuse.existing.files <- reuse.existing.files #FIXME: take this from call
+    conf$cluster.plots <- cluster.plots
 #    checkClass(conf=conf) # this is still too verbose
     # ^^ also should check/set [most will be done in checkClass already]:
     #  binsize/stepsize is integer >= 1; one step size for each bin size
@@ -38,63 +40,84 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #  NCBI/UCSC chromosome names consistent
     #  blacklist also has right chromosomes
 
-    if (length(inputfolder) == 1 && dir.exists(inputfolder))
-        inputfolder <- list.files(inputfolder, "\\.(bam|bed(\\.gz)?)$", full.names=TRUE)
-    if (length(inputfolder) == 0)
-        stop("No BAM or BED files supplied or in directory")
-    names(inputfolder) <- tools::file_path_sans_ext(basename(inputfolder))
+    makedir(conf$outputfolder)
 
-    if (!file.exists(conf[['outputfolder']]))
-        dir.create(conf[['outputfolder']])
-
-    if (is.null(assembly))
+    if (is.null(assembly)) # this currently doesn't work with a inputFOLDER and no assembly
         seqinfo <- genome(inputfolder[1])
-    else
+    else {
         seqinfo <- genome(assembly)
-
-    # provide a function to call(partitionGenome, conf) that matches args?
-    #   also potentially combine with looking if results are there + skip (otherwise +save)
-    bins <- partitionGenome(seqinfo, binsize=binsizes,
-                            reads.per.bin=reads.per.bin, stepsize=stepsizes)
-    if ("GC" %in% correction.method)
-        bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
-
-    # check if the binned files are available first and load, or save otherwise
-    # probably provide a filenames.S3 to query file names based on function calls
-    #   file.path(conf[['outputfolder']],'filtered')
-    #   save(reads,file=file.path(path.filtered.reads,paste0(basename(file.cur),'.Rdata')))
-    #   path.uncorrected.bins   <- file.path(conf[['outputfolder']],'binned')
-    #   paste0("binsize_",format(binsize,scientific=TRUE,trim=TRUE),"_stepsize_",
-    #                            format(stepsize,scientific=TRUE,trim=TRUE))
-    #  inp_file            <- basename(file.cur)
-    #  inp_file            <- substr(inp_file,1,(nchar(inp_file)-6))
-    #  file.save           <- file.path(path.uncorrected.bins,paste0(inp_file,"_",combi,".RData"))
-    args <- conf[intersect(names(conf), names(formals(readGRanges)))]
-    reads <- do.call("binReads", c(args, list(reads=inputfolder, bins=bins)))
-
-    if ("GC" %in% correction.method)
-        reads <- correctGC(reads, method="loess")
-
-    # reads: {output}/data
-    # create {output}/MODELS{,_refined} /PLOTS /BROWSERFILES
-    # save
-
-    args <- conf[intersect(names(conf), names(formals(findCNVs)))]
-    models <- do.call("findCNVs", c(args, list(binned=reads)))
-
-    # missing: refine breakpoints, breakpoint hotspots
-
-    # create plotdir
-
-    fname <- file.path(plotdir,paste0('genomeHeatmap_',sub('_$','',pattern), '.pdf'))
-    heatmapGenomewide(models, cluster=TRUE, file=fname)
-
-    fname <- file.path(plotdir,paste0('aneuploidyHeatmap_',sub('_$','',pattern), '.pdf'))
-    pdf(fname, width=30, height=max(0.3*length(models), 2/2.54))
-    for (i in seq_along(all_models)) {
-        message("Read density plot for: ", names(all_models)[i])
-        if (class(models[[i]]) == "aneuHMM") #TODO: is this required?
-            print(plot(models[[i]]))
+        assembly <- unique(GenomeInfoDb::genome(seqinfo))
     }
-    dev.off()
+
+    ###
+    ### Bin the genome
+    ###
+    fname <- args2fname(file.path(conf$outputfolder, assembly),
+        binsize=binsizes, stepsize=stepsizes)
+    if (file.exists(fname) && conf$reuse.existing.files) {
+        bins <- readRDS(fname)
+    } else {
+        bins <- partitionGenome(seqinfo, binsize=binsizes,
+                                reads.per.bin=reads.per.bin, stepsize=stepsizes)
+        if ("GC" %in% correction.method)
+            bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
+        saveRDS(bins, file=fname)
+    }
+
+    # missing: filtered reads -- file.path(conf[['outputfolder']],'filtered')
+
+    ###
+    ### Assign reads to bins
+    ###
+    bin_reads <- function(x, dir=makedir(conf$outputfolder, "binned")) {
+        fname <- args2fname(file.path(dir, basename(x)),
+            binsize=binsizes, stepsize=stepsizes)
+        if (file.exists(fname) && conf$reuse.existing.files) {
+            reads <- readRDS(fname)
+        } else {
+            args <- conf[intersect(names(conf), names(formals(readGRanges)))]
+            reads <- do.call("binReads", c(args, list(reads=x, bins=bins)))
+            if ("GC" %in% correction.method)
+                reads <- correctGC(reads, method="loess")
+            saveRDS(reads, file=fname)
+        }
+    }
+    reads <- lapply(inputfolder, bin_reads)
+
+    ###
+    ### Identify CNVs
+    ###
+    find_cnvs <- function(x, dir=makedir(conf$outputfolder, "MODELS")) {
+        fname <- args2fname(file.path(dir, attr(x, 'ID')), method=method)
+        if (file.exists(fname) && conf$reuse.existing.files) {
+            models <- readRDS(fname)
+        } else {
+            args <- conf[intersect(names(conf), names(formals(findCNVs)))]
+            models <- do.call("findCNVs", c(args, list(binned=x)))
+            saveRDS(models, file=fname)
+        }
+    }
+    models <- lapply(reads, find_cnvs) #FIXME: fails on first run
+
+    ###
+    ### Refine breakpoints, breakpoint hotspots
+    ###
+
+    ###
+    ### Make plots
+    ###
+    plotdir <- makedir(conf$outputfolder, "PLOTS")
+    fname <- args2fname(file.path(plotdir, "genomeHeatmap"), ext=".pdf")
+    if (!file.exists(fname))
+        heatmapGenomewide(models, cluster=conf$cluster.plots, file=fname)
+
+    fname <- args2fname(file.path(plotdir, "aneuploidyHeatmap"), ext=".pdf")
+    if (!file.exists(fname)) {
+        pdf(fname, width=30, height=max(0.3*length(models), 2/2.54))
+        for (i in seq_along(models)) {
+            message("Read density plot for: ", names(models)[i])
+            print(plot(models[[i]]))
+        }
+        dev.off()
+    }
 }

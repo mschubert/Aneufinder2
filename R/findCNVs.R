@@ -30,7 +30,7 @@
 #' model <- findCNVs(binned[[1]])
 #' # Check the fit
 #' plot(model, type='histogram')
-findCNVs <- function(binned, strandseq=FALSE, ID=NULL, method="edivisive",
+findCNVs <- function(binned, strandseq=FALSE, ID=attr(binned,'ID'), method="edivisive",
                      strand='*', R=10, sig.lvl=0.1, eps=0.01, init="standard",
                      max.time=-1, max.iter=1000, num.trials=15,
                      eps.try=max(10*eps, 1), num.threads=1,

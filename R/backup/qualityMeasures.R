@@ -173,7 +173,7 @@ getQC <- function(models) {
             return(x)
         }
     }
-  	models <- suppressMessages( loadFromFiles(models, check.class=c('GRanges', 'GRangesList', "aneuHMM", "aneuBiHMM")) )
+#  	models <- suppressMessages( loadFromFiles(models, check.class=c('GRanges', 'GRangesList', "aneuHMM", "aneuBiHMM")) )
   	qframe <- list()
   	for (i1 in 1:length(models)) {
     		model <- models[[i1]]
@@ -260,7 +260,7 @@ getQC <- function(models) {
 #'
 clusterByQuality <- function(hmms, G=1:9, itmax=c(100,100), measures=c('spikiness','entropy','num.segments','bhattacharyya','complexity','sos'), orderBy='spikiness', reverseOrder=FALSE) {
 	
-	hmms <- loadFromFiles(hmms, check.class=c("aneuHMM", "aneuBiHMM"))
+#	hmms <- loadFromFiles(hmms, check.class=c("aneuHMM", "aneuBiHMM"))
 	df <- getQC(hmms)
 	df <- df[measures]
 	ptm <- startTimedMessage("clustering ...")

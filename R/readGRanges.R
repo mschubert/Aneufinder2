@@ -10,11 +10,14 @@ readGRanges.character <- function(x, ...) {
         stop("readGRanges needs exactly one file")
 
     if (grepl("\\.bam$", x))
-        readGRanges(Rsamtools::BamFile(x))
+        gr <- readGRanges(Rsamtools::BamFile(x))
     else if (grepl("\\.bed(\\.gz)?$", x))
-        readGRanges.BedFile(x, ...)
+        gr <- readGRanges.BedFile(x, ...)
     else
         stop("Unknown file extension (bam/bed supported): ", sQuote(x))
+
+    attr(gr, 'ID') <- tools::file_path_sans_ext(basename(x))
+    gr
 }
 
 readGRanges.BamFile <- function(x, seqinfo=GenomeInfoDb::seqinfo(x), min.mapq=10,
