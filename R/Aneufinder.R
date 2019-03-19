@@ -71,7 +71,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #  inp_file            <- substr(inp_file,1,(nchar(inp_file)-6))
     #  file.save           <- file.path(path.uncorrected.bins,paste0(inp_file,"_",combi,".RData"))
     args <- conf[intersect(names(conf), names(formals(readGRanges)))]
-    reads <- do.call(binReads, c(args, list(reads=inputfolder, bins=bins)))
+    reads <- do.call("binReads", c(args, list(reads=inputfolder, bins=bins)))
     # also include number correction here (in separate mcols field)
 
     reads <- correctGC(reads, method="loess")
@@ -81,7 +81,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     # save
 
     args <- conf[intersect(names(conf), names(formals(findCNVs)))]
-    model <- do.call(findCNVs, c(args, list(binned=reads)))
+    model <- do.call("findCNVs", c(args, list(binned=reads)))
 
     #TODO: add plots, etc.
     model

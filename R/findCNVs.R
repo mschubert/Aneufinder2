@@ -78,6 +78,6 @@ findCNVs <- function(binned, strandseq=FALSE, ID=NULL, method="edivisive",
         }
     }
 
-    attr(model, 'call') <- match.call()
+#    attr(model, 'call') <- match.call() # this will str(binned)
     model
 }
