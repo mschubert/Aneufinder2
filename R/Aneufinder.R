@@ -56,8 +56,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #   also potentially combine with looking if results are there + skip (otherwise +save)
     bins <- partitionGenome(seqinfo, binsize=binsizes,
                             reads.per.bin=reads.per.bin, stepsize=stepsizes)
-
-    bins <- correctGC(bins, BSgenome=GC.BSgenome)
+    bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
 
     # check if the binned files are available first and load, or save otherwise
     # probably provide a filenames.S3 to query file names based on function calls
@@ -72,6 +71,8 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     args <- conf[intersect(names(conf), names(formals(readGRanges)))]
     reads <- do.call(binReads, c(args, list(reads=inputfolder, bins=bins)))
     # also include number correction here (in separate mcols field)
+
+    reads <- correctGC(reads, method="loess")
 
     # reads: {output}/data
     # create {output}/MODELS{,_refined} /PLOTS /BROWSERFILES

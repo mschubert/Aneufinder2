@@ -18,13 +18,12 @@ binReads.character <- function(reads, bins) {
 
 binReads.GRanges <- function(reads, bins) {
     reads <- split(reads, GenomicRanges::strand(reads))
-    counts <- lapply(reads, function(r)
-                     suppressWarnings(GenomicRanges::countOverlaps(bins, r)))
+    clist <- lapply(reads, function(r)
+                    suppressWarnings(GenomicRanges::countOverlaps(bins, r)))
 
-    counts <- S4Vectors::DataFrame(counts = Reduce(`+`, counts),
-                                   mcounts = counts$`-`,
-                                   pcounts = counts$`+`)
-    GenomicRanges::mcols(bins) <- counts
+    bins$counts <- Reduce(`+`, clist)
+    bins$mcounts <- clist$`-`
+    bins$pcounts <- clist$`+`
 
     attr(bins, 'ID') <- attr(reads, 'ID')
     bins
