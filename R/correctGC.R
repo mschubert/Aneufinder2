@@ -11,9 +11,16 @@ correctGC.GRanges <- function(bins, BSgenome=NULL, method='loess') {
     }
     bs.genome <- getFromNamespace(BSgenome, ns=BSgenome)
 
-    # check memory here; cf: https://support.bioconductor.org/p/89480/
-    views <- Biostrings::Views(bs.genome, bins)
-    bins$GC.content <- Biostrings::letterFrequency(views, letters="GC", as.prob=TRUE)
+    # # this needs too much memory: https://support.bioconductor.org/p/89480/
+    # views <- Biostrings::Views(bs.genome, bins)
+    # bins$GC.content <- Biostrings::letterFrequency(views, letters="GC", as.prob=TRUE)
+    chunk2gc <- function(chunk) {
+        views <- Biostrings::Views(bs.genome, chunk)
+        Biostrings::letterFrequency(views, letters="GC", as.prob=TRUE)
+    }
+    n.chunks <- 100
+    chunks <- split(bins, round(seq(1, n.chunks, length.out=length(bins))))
+    bins$GC.content = unlist(lapply(chunks, chunk2gc), use.names=FALSE)
 
     if (method == 'loess') {
         # check: use predict() here instead?
