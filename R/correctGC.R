@@ -1,3 +1,5 @@
+# check for same genome if passed a list?
+# should this addGCcontent if not already present?
 correctGC <- function(reads, method='loess') {
     UseMethod("correctGC")
 }
