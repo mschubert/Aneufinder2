@@ -52,7 +52,8 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #   also potentially combine with looking if results are there + skip (otherwise +save)
     bins <- partitionGenome(seqinfo, binsize=binsizes,
                             reads.per.bin=reads.per.bin, stepsize=stepsizes)
-    # also calc (GC) correction factors here
+
+    bins <- correctGC(bins, BSgenome=GC.BSgenome)
 
     # check if the binned files are available first and load, or save otherwise
     # probably provide a filenames.S3 to query file names based on function calls
@@ -65,18 +66,15 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #  inp_file            <- substr(inp_file,1,(nchar(inp_file)-6))
     #  file.save           <- file.path(path.uncorrected.bins,paste0(inp_file,"_",combi,".RData"))
     args <- conf[intersect(names(conf), names(formals(readGRanges)))]
-    args$reads <- inputfolder
-    args$bins <- bins
-    reads <- do.call(binReads, args)
+    reads <- do.call(binReads, c(args, list(reads=inputfolder, bins=bins)))
     # also include number correction here (in separate mcols field)
 
     # reads: {output}/data
     # create {output}/MODELS{,_refined} /PLOTS /BROWSERFILES
-    # save 
+    # save
 
     args <- conf[intersect(names(conf), names(formals(findCNVs)))]
-    args$binned <- reads
-    model <- do.call(findCNVs, args)
+    model <- do.call(findCNVs, c(args), list(binned=reads))
 
     #TODO: add plots, etc.
     model

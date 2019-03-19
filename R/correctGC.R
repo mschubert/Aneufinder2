@@ -1,11 +1,15 @@
-correctGC <- function(bins, method='loess') {
+correctGC <- function(bins, BSgenome=NULL, method='loess') {
     UseMethod("correctGC")
 }
 
-correctGC.GRanges <- function(bins, method='loess') {
-    assembly <- unique(GenomeInfoDb::genome(GenomeInfoDb::seqinfo(bins)))
-    bs.name <- grep(assembly, BSgenome::available.genomes(), value=TRUE)[1]
-    bs.genome <- getFromNamespace(bs.name, ns=bs.name)
+correctGC.GRanges <- function(bins, BSgenome=NULL, method='loess') {
+    if (is.null(BSgenome)) {
+        assembly <- unique(GenomeInfoDb::genome(GenomeInfoDb::seqinfo(bins)))
+        if (is.na(assembly))
+            stop("No genome information in bins and no explicit BSgenome given")
+        BSgenome <- grep(assembly, BSgenome::available.genomes(), value=TRUE)[1]
+    }
+    bs.genome <- getFromNamespace(BSgenome, ns=BSgenome)
 
     # check memory here; cf: https://support.bioconductor.org/p/89480/
     views <- Biostrings::Views(bs.genome, bins)
@@ -23,8 +27,8 @@ correctGC.GRanges <- function(bins, method='loess') {
     bins
 }
 
-correctGC.list <- function(bins, method='loess') {
-    lapply(bins, correctGC, method=method)
+correctGC.list <- function(bins, BSgenome=NULL, method='loess') {
+    lapply(bins, correctGC, BSgenome=BSgenome, method=method)
 }
 
 correctGC.default <- function(bins, method='loess') {
