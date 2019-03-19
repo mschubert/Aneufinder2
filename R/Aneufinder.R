@@ -80,8 +80,21 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     # save
 
     args <- conf[intersect(names(conf), names(formals(findCNVs)))]
-    model <- do.call("findCNVs", c(args, list(binned=reads)))
+    models <- do.call("findCNVs", c(args, list(binned=reads)))
 
-    #TODO: add plots, etc.
-    model
+    # missing: refine breakpoints, breakpoint hotspots
+
+    # create plotdir
+
+    fname <- file.path(plotdir,paste0('genomeHeatmap_',sub('_$','',pattern), strandseq.string, '.pdf'))
+    heatmapGenomewide(models, cluster=TRUE, file=fname)
+
+    fname <- file.path(plotdir,paste0('aneuploidyHeatmap_',sub('_$','',pattern), strandseq.string,'.pdf'))
+    pdf(fname, width=30, height=max(0.3*length(models), 2/2.54))
+    for (i in seq_along(all_models)) {
+        message("Read density plot for: ", names(all_models)[i])
+        if (class(models[[i]]) == "aneuHMM") #TODO: is this required?
+            print(plot(models[[i]]))
+    }
+    dev.off()
 }
