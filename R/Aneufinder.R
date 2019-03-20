@@ -42,7 +42,11 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
 
     makedir(conf$outputfolder)
 
-    if (is.null(assembly)) # this currently doesn't work with a inputFOLDER and no assembly
+    if (length(inputfolder) == 1 && dir.exists(inputfolder))
+        inputfolder = list.files(inputfolder, "\\.(bam|bed(\\.gz)?)$", full.names=TRUE)
+    names(inputfolder) <- tools::file_path_sans_ext(basename(inputfolder))
+
+    if (is.null(assembly))
         seqinfo <- genome(inputfolder[1])
     else {
         seqinfo <- genome(assembly)
@@ -98,7 +102,6 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
         models
     }
     models <- lapply(reads, find_cnvs)
-    names(models) <- sapply(models, function(m) m$ID)
 
     ###
     ### Refine breakpoints, breakpoint hotspots
