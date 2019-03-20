@@ -28,23 +28,9 @@ partitionGenome.Seqinfo <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
         end(bins) <- (start(bins) + binsize - 1)
 
     GenomeInfoDb::seqinfo(bins) <- seqinfo
+    attr(bins, 'binsize') <- binsize
+    attr(bins, 'stepsize') <- stepsize
     bins
-}
-
-#TODO: use custom class here for binned reads(?)
-partitionGenome.GRanges <- function(seqinfo, binsize=1e6,
-                                    reads.per.bin=NULL, stepsize=NULL) {
-    stop("not implemented")
-    # seqinfo = GRanges with counts from variable width ref?
-    #  would need fixed bins + read counts from readGRanges(variable width ref)
-
-    mediancount <- as.integer(median(bins$counts[bins$counts>0]))
-    mc.perstep <- unique(as.integer((1:numsteps) * mediancount / numsteps))
-
-    chrs <- split(bins, GenomicRanges::seqnames(bins))
-    margins <- lapply(chrs, function(x) x[seq(mc.perstep, length(x), by=mediancount)])
-    margins <- unlist(margins)
-#    bins <- 
 }
 
 partitionGenome.character <- function(seqinfo, ...) {

@@ -57,15 +57,29 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     ### Bin the genome
     ###
     fname <- args2fname(file.path(conf$outputfolder, assembly),
-        binsize=binsizes, stepsize=stepsizes)
+        "fixed", binsize=binsizes, stepsize=stepsizes)
     if (file.exists(fname) && conf$reuse.existing.files) {
         bins <- readRDS(fname)
     } else {
         bins <- partitionGenome(seqinfo, binsize=binsizes,
                                 reads.per.bin=reads.per.bin, stepsize=stepsizes)
-        if ("GC" %in% correction.method)
+        if ("GC" %in% correction.method && is.null(variable.width.reference))
             bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
         saveRDS(bins, file=fname)
+    }
+
+    if (!is.null(variable.width.reference)) {
+        reads <- readGRanges(variable.width.reference)
+        fname <- args2fname(file.path(conf$outputfolder, assembly),
+            "variable", binsize=binsizes, stepsize=stepsizes)
+        if (file.exists(fname) && conf$reuse.existing.files) {
+            bins <- readRDS(fname)
+        } else {
+            bins <- adjustPartitions(bins, reads)
+            if ("GC" %in% correction.method)
+                bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
+            saveRDS(bins, file=fname)
+        }
     }
 
     # missing: filtered reads -- file.path(conf[['outputfolder']],'filtered')
