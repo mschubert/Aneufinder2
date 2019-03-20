@@ -70,7 +70,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     ### Assign reads to bins
     ###
     bin_reads <- function(x, dir=makedir(conf$outputfolder, "binned")) {
-        fname <- args2fname(file.path(dir, basename(x)),
+        fname <- args2fname(file.path(dir, tools::file_path_sans_ext(basename(x))),
             binsize=binsizes, stepsize=stepsizes)
         if (file.exists(fname) && conf$reuse.existing.files)
             return(readRDS(fname))

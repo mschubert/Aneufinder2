@@ -63,9 +63,9 @@ stopTimedMessage <- function(ptm) {
 args2fname <- function(base, ..., ext='.rds') {
     fmt <- function(key, value) {
         if (is.character(value))
-            paste(key, value, sep="_")
+            paste(key, value, sep="-")
         else
-            gsub("\\+0", "", sprintf("%s_%.2g", key, value))
+            gsub("\\+0", "", sprintf("%s%.2g", key, value))
     }
     args <- list(...)
     if (length(args) > 0) {
