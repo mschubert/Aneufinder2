@@ -5,95 +5,148 @@
 \title{Wrapper function for the \code{\link{AneuFinder}} package}
 \usage{
 Aneufinder(inputfolder, outputfolder, configfile = NULL, numCPU = 1,
-  reuse.existing.files = TRUE, binsizes = 1e+06, stepsizes = binsizes,
-  variable.width.reference = NULL, reads.per.bin = NULL,
-  pairedEndReads = FALSE, assembly = NULL, chromosomes = NULL,
-  remove.duplicate.reads = TRUE, min.mapq = 10, blacklist = NULL,
-  use.bamsignals = FALSE, reads.store = FALSE, correction.method = NULL,
-  GC.BSgenome = NULL, method = c("edivisive"), strandseq = FALSE,
-  R = 10, sig.lvl = 0.1, eps = 0.01, max.time = 60, max.iter = 5000,
-  num.trials = 15, states = c("zero-inflation", paste0(0:10, "-somy")),
-  confint = NULL, refine.breakpoints = FALSE, hotspot.bandwidth = NULL,
+  reuse.existing.files = TRUE, binsizes = 1e+06,
+  stepsizes = binsizes, variable.width.reference = NULL,
+  reads.per.bin = NULL, pairedEndReads = FALSE, assembly = NULL,
+  chromosomes = NULL, remove.duplicate.reads = TRUE, min.mapq = 10,
+  blacklist = NULL, use.bamsignals = FALSE, reads.store = FALSE,
+  correction.method = NULL, GC.BSgenome = NULL, method = "edivisive",
+  strandseq = FALSE, R = 10, sig.lvl = 0.1, eps = 0.01,
+  max.time = 60, max.iter = 5000, num.trials = 15,
+  states = c("zero-inflation", paste0(0:10, "-somy")),
+  most.frequent.state = "2-somy",
+  most.frequent.state.strandseq = "1-somy", confint = NULL,
+  refine.breakpoints = FALSE, hotspot.bandwidth = NULL,
   hotspot.pval = 0.05, cluster.plots = TRUE)
 }
 \arguments{
 \item{inputfolder}{Folder with either BAM or BED files.}
 
-\item{outputfolder}{Folder to output the results. If it does not exist it will be created.}
+\item{outputfolder}{Folder to output the results. If it does not exist it
+will be created.}
 
-\item{configfile}{A file specifying the parameters of this function (without \code{inputfolder}, \code{outputfolder} and \code{configfile}). Having the parameters in a file can be handy if many samples with the same parameter settings are to be run. If a \code{configfile} is specified, it will take priority over the command line parameters.}
+\item{configfile}{A file specifying the parameters of this function (without
+\code{inputfolder}, \code{outputfolder} and \code{configfile}). Having the
+parameters in a file can be handy if many samples with the same parameter
+settings are to be run. If a \code{configfile} is specified, it will take
+priority over the command line parameters.}
 
-\item{numCPU}{The numbers of CPUs that are used. Should not be more than available on your machine.}
+\item{numCPU}{The numbers of CPUs that are used. Should not be more than
+available on your machine.}
 
-\item{reuse.existing.files}{A logical indicating whether or not existing files in \code{outputfolder} should be reused.}
+\item{reuse.existing.files}{A logical indicating whether or not existing
+files in \code{outputfolder} should be reused.}
 
-\item{binsizes}{An integer vector with bin sizes. If more than one value is given, output files will be produced for each bin size.}
+\item{binsizes}{An integer vector with bin sizes. If more than one value is
+given, output files will be produced for each bin size.}
 
-\item{stepsizes}{A vector of step sizes the same length as \code{binsizes}. Only used for \code{method="HMM"}.}
+\item{stepsizes}{A vector of step sizes the same length as \code{binsizes}.
+Only used for \code{method="HMM"}.}
 
-\item{variable.width.reference}{A BAM file that is used as reference to produce variable width bins. See \code{\link{variableWidthBins}} for details.}
+\item{variable.width.reference}{A BAM file that is used as reference to
+produce variable width bins. See \code{\link{variableWidthBins}} for
+details.}
 
-\item{reads.per.bin}{Approximate number of desired reads per bin. The bin size will be selected accordingly. Output files are produced for each value.}
+\item{reads.per.bin}{Approximate number of desired reads per bin. The bin
+size will be selected accordingly. Output files are produced for each value.}
 
-\item{pairedEndReads}{Set to \code{TRUE} if you have paired-end reads in your BAM files (not implemented for BED files).}
+\item{chromosomes}{If only a subset of the chromosomes should be binned,
+specify them here.}
 
-\item{assembly}{Please see \code{\link[GenomeInfoDb]{fetchExtendedChromInfoFromUCSC}} for available assemblies. Only necessary when importing BED files. BAM files are handled automatically. Alternatively a data.frame with columns 'chromosome' and 'length'.}
+\item{use.bamsignals}{If \code{TRUE} the \pkg{\link[bamsignals]{bamsignals}}
+package will be used for binning. This gives a tremendous performance
+increase for the binning step. \code{reads.store} and \code{calc.complexity}
+will be set to \code{FALSE} in this case.}
 
-\item{chromosomes}{If only a subset of the chromosomes should be imported, specify them here.}
+\item{reads.store}{Set \code{reads.store=TRUE} to
+store read fragments as RData in folder 'data' and as BED files in
+'BROWSERFILES/data'. This option will force \code{use.bamsignals=FALSE}.}
 
-\item{remove.duplicate.reads}{A logical indicating whether or not duplicate reads should be removed.}
+\item{correction.method}{Correction methods to be used for the binned read
+counts. Currently only \code{'GC'}.}
 
-\item{min.mapq}{Minimum mapping quality when importing from BAM files. Set \code{min.mapq=NA} to keep all reads.}
+\item{GC.BSgenome}{A \code{BSgenome}
+object which contains the DNA sequence that is used for the GC correction.}
 
-\item{blacklist}{A \code{\link{GRanges-class}} or a bed(.gz) file with blacklisted regions. Reads falling into those regions will be discarded.}
+\item{method}{Any combination of \code{c('HMM','dnacopy','edivisive')}.
+   Option \code{method='HMM'} uses a Hidden Markov Model as described in 
+  doi:10.1186/s13059-016-0971-7 to call copy numbers.
+Option \code{'dnacopy'} uses \code{\link[DNAcopy]{segment}} from the 
+  \pkg{\link[DNAcopy]{DNAcopy}} package to call copy numbers similarly to
+  the method proposed in doi:10.1038/nmeth.3578, which gives more robust
+  but less sensitive results compared to the HMM.
+Option \code{'edivisive'} (DEFAULT) works like option \code{'dnacopy'} but
+  uses the \code{\link[ecp]{e.divisive}} function from the \pkg{ecp}
+  package for segmentation.}
 
-\item{use.bamsignals}{If \code{TRUE} the \pkg{\link[bamsignals]{bamsignals}} package will be used for binning. This gives a tremendous performance increase for the binning step. \code{reads.store} and \code{calc.complexity} will be set to \code{FALSE} in this case.}
+\item{strandseq}{A logical indicating whether the data comes from Strand-seq
+experiments. If \code{TRUE}, both strands carry information and are treated
+separately.}
 
-\item{reads.store}{Set \code{reads.store=TRUE} to store read fragments as RData in folder 'data' and as BED files in 'BROWSERFILES/data'. This option will force \code{use.bamsignals=FALSE}.}
+\item{R}{method-edivisive: The maximum number of random permutations to use
+in each iteration of the permutation test (see \code{\link[ecp]{e.divisive}}).
+Increase this value to increase accuracy on the cost of speed.}
 
-\item{correction.method}{Correction methods to be used for the binned read counts. Currently only \code{'GC'}.}
-
-\item{GC.BSgenome}{A \code{BSgenome} object which contains the DNA sequence that is used for the GC correction.}
-
-\item{method}{Any combination of \code{c('HMM','dnacopy','edivisive')}. Option \code{method='HMM'} uses a Hidden Markov Model as described in doi:10.1186/s13059-016-0971-7 to call copy numbers. Option \code{'dnacopy'} uses \code{\link[DNAcopy]{segment}} from the \pkg{\link[DNAcopy]{DNAcopy}} package to call copy numbers similarly to the method proposed in doi:10.1038/nmeth.3578, which gives more robust but less sensitive results compared to the HMM. Option \code{'edivisive'} (DEFAULT) works like option \code{'dnacopy'} but uses the \code{\link[ecp]{e.divisive}} function from the \pkg{ecp} package for segmentation.}
-
-\item{strandseq}{A logical indicating whether the data comes from Strand-seq experiments. If \code{TRUE}, both strands carry information and are treated separately.}
-
-\item{R}{method-edivisive: The maximum number of random permutations to use in each iteration of the permutation test (see \code{\link[ecp]{e.divisive}}). Increase this value to increase accuracy on the cost of speed.}
-
-\item{sig.lvl}{method-edivisive: The level at which to sequentially test if a proposed change point is statistically significant (see \code{\link[ecp]{e.divisive}}). Increase this value to find more breakpoints.}
+\item{sig.lvl}{method-edivisive: The level at which to sequentially test if
+a proposed change point is statistically significant (see
+\code{\link[ecp]{e.divisive}}). Increase this value to find more breakpoints.}
 
 \item{eps}{method-HMM: Convergence threshold for the Baum-Welch algorithm.}
 
-\item{max.time}{method-HMM: The maximum running time in seconds for the Baum-Welch algorithm. If this time is reached, the Baum-Welch will terminate after the current iteration finishes. Set \code{max.time = -1} for no limit.}
+\item{max.time}{method-HMM: The maximum running time in seconds for the
+Baum-Welch algorithm. If this time is reached, the Baum-Welch will terminate
+after the current iteration finishes. Set \code{max.time = -1} for no limit.}
 
-\item{max.iter}{method-HMM: The maximum number of iterations for the Baum-Welch algorithm. Set \code{max.iter = -1} for no limit.}
+\item{max.iter}{method-HMM: The maximum number of iterations for the
+Baum-Welch algorithm. Set \code{max.iter = -1} for no limit.}
 
-\item{num.trials}{method-HMM: The number of trials to find a fit where state \code{most.frequent.state} is most frequent. Each time, the HMM is seeded with different random initial values.}
+\item{num.trials}{method-HMM: The number of trials to find a fit where state
+\code{most.frequent.state} is most frequent. Each time, the HMM is seeded
+with different random initial values.}
 
-\item{states}{method-HMM: A subset or all of \code{c("zero-inflation","0-somy","1-somy","2-somy","3-somy","4-somy",...)}. This vector defines the states that are used in the Hidden Markov Model. The order of the entries must not be changed.}
+\item{states}{method-HMM: A subset or all of
+\code{c("zero-inflation","0-somy","1-somy","2-somy","3-somy","4-somy",...)}.
+This vector defines the states that are used in the Hidden Markov Model.
+The order of the entries must not be changed.}
 
-\item{confint}{Desired confidence interval for breakpoints. Set \code{confint=NULL} to disable confidence interval estimation. Confidence interval estimation will force \code{reads.store=TRUE}.}
+\item{most.frequent.state}{method-HMM: One of the states that were given in
+\code{states}. The specified state is assumed to be the most frequent one.
+This can help the fitting procedure to converge into the correct fit.}
 
-\item{refine.breakpoints}{A logical indicating whether breakpoints from the HMM should be refined with read-level information. \code{refine.breakpoints=TRUE} will force \code{reads.store=TRUE}.}
+\item{confint}{Desired confidence interval for breakpoints. Set
+\code{confint=NULL} to disable confidence interval estimation. Confidence
+interval estimation will force \code{reads.store=TRUE}.}
 
-\item{hotspot.bandwidth}{A vector the same length as \code{binsizes} with bandwidths for breakpoint hotspot detection (see \code{\link{hotspotter}} for further details). If \code{NULL}, the bandwidth will be chosen automatically as the average distance between reads.}
+\item{refine.breakpoints}{A logical indicating whether breakpoints from the
+HMM should be refined with read-level information.
+\code{refine.breakpoints=TRUE} will force \code{reads.store=TRUE}.}
 
-\item{hotspot.pval}{P-value for breakpoint hotspot detection (see \code{\link{hotspotter}} for further details). Set \code{hotspot.pval = NULL} to skip hotspot detection.}
+\item{hotspot.bandwidth}{A vector the same length as \code{binsizes} with
+bandwidths for breakpoint hotspot detection (see \code{\link{hotspotter}}
+for further details). If \code{NULL}, the bandwidth will be chosen
+automatically as the average distance between reads.}
 
-\item{cluster.plots}{A logical indicating whether plots should be clustered by similarity.}
+\item{hotspot.pval}{P-value for breakpoint hotspot detection (see \code{\link{hotspotter}} for
+further details). Set \code{hotspot.pval = NULL} to skip hotspot detection.}
+
+\item{cluster.plots}{A logical indicating whether plots should be clustered
+by similarity.}
 }
 \value{
 \code{NULL}
 }
 \description{
-This function is an easy-to-use wrapper to \link[AneuFinder:binning]{bin the data}, \link[AneuFinder:findCNVs]{find copy-number-variations}, \link[AneuFinder:getBreakpoints]{locate breakpoints}, plot \link[AneuFinder:heatmapGenomewide]{genomewide heatmaps}, \link[AneuFinder:plot.aneuHMM]{distributions, profiles and karyograms}.
+This function is an easy-to-use wrapper to \link[AneuFinder:binning]{bin the
+data}, \link[AneuFinder:findCNVs]{find copy-number-variations},
+\link[AneuFinder:getBreakpoints]{locate breakpoints}, plot
+\link[AneuFinder:heatmapGenomewide]{genomewide heatmaps},
+\link[AneuFinder:plot.aneuHMM]{distributions, profiles and karyograms}.
 }
 \examples{
 \dontrun{
 ## The following call produces plots and genome browser files for all BAM files in "my-data-folder"
-Aneufinder(inputfolder="my-data-folder", outputfolder="my-output-folder")}
-
+Aneufinder(inputfolder="my-data-folder", outputfolder="my-output-folder")
+}
 }
 \author{
 Aaron Taudt
