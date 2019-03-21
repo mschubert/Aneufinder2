@@ -1,6 +1,8 @@
 #' Read a sequence region file into a GRanges object
 #'
-#' @param ...
+#' @param x  File name to read into GRanges object
+#' @param seqinfo  Seqinfo object with metadata about the genome
+#' @return  A GRanges object containing all the reads of the sequence file
 readGRanges <- function(x, seqinfo=GenomeInfoDb::seqinfo(x), ...) {
     UseMethod("readGRanges")
 }
