@@ -126,8 +126,8 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     if (file.exists(fname) && conf$reuse.existing.files) {
         bins <- readRDS(fname)
     } else {
-        bins <- partitionGenome(seqinfo, binsize=binsizes,
-                                reads.per.bin=reads.per.bin, stepsize=stepsizes)
+        bins <- genomeBins(seqinfo, binsize=binsizes,
+                           reads.per.bin=reads.per.bin, stepsize=stepsizes)
         if ("GC" %in% correction.method && is.null(variable.width.reference))
             bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
         saveRDS(bins, file=fname)
@@ -140,7 +140,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
         if (file.exists(fname) && conf$reuse.existing.files) {
             bins <- readRDS(fname)
         } else {
-            bins <- adjustPartitions(bins, reads)
+            bins <- adjustBins(bins, reads)
             if ("GC" %in% correction.method)
                 bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
             saveRDS(bins, file=fname)

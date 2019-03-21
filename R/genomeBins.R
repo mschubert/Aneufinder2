@@ -38,12 +38,12 @@ NULL
 #' ## Make fixed-width bins of size 500kb and 1Mb
 #' bins <- fixedWidthBins(assembly='mm10', chromosome.format='NCBI', binsizes=c(5e5,1e6))
 #' bins
-partitionGenome <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
+genomeBins <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
                             stepsize=NULL) {
-    UseMethod("partitionGenome")
+    UseMethod("genomeBins")
 }
 
-partitionGenome.Seqinfo <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
+genomeBins.Seqinfo <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
                                     stepsize=NULL) {
     if (is.null(stepsize))
         stepsize <- binsize
@@ -70,10 +70,10 @@ partitionGenome.Seqinfo <- function(seqinfo, binsize=1e6, reads.per.bin=NULL,
     bins
 }
 
-partitionGenome.character <- function(seqinfo, ...) {
-    partitionGenome(genome(x), ...)
+genomeBins.character <- function(seqinfo, ...) {
+    genomeBins(genome(x), ...)
 }
 
-partitionGenome.default <- function(x, ...) {
+genomeBins.default <- function(x, ...) {
     stop("Do not know how to create bins from object type ", sQuote(class(x)))
 }

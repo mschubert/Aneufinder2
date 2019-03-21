@@ -33,7 +33,7 @@
 #' bins <- variableWidthBins(reads, binsizes=c(5e5,1e6))
 #' ## Plot the distribution of binsizes
 #' hist(width(bins[['binsize_1e+06']]), breaks=50)
-adjustPartitions <- function(bins, reads) {
+adjustBins <- function(bins, reads) {
     bins <- binReads(reads, bins)
     strand(reads) <- '*'
     reads <- sort(reads)

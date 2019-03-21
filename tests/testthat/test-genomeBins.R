@@ -2,7 +2,7 @@ context("partition genome")
 
 test_that("fixed width bins", {
     genome = genome("mm10")
-    bins = partitionGenome(genome, binsize=1e6)
+    bins = genomeBins(genome, binsize=1e6)
 
     expect_equal(length(bins), 2625)
     expect_equal(GenomeInfoDb::seqinfo(bins), genome)
