@@ -190,16 +190,19 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     ### Make plots
     ###
     plotdir <- makedir(conf$outputfolder, "PLOTS")
-    fname <- args2fname(file.path(plotdir, "genomeHeatmap"), ext=".pdf")
-    if (!file.exists(fname))
-        heatmapGenomewide(models, cluster=conf$cluster.plots, file=fname)
+    fname <- args2fname(file.path(plotdir, "karyograms"), ext=".pdf")
+    if (!file.exists(fname)) {
+        pdf(fname, width=20, height=length(models)+4)
+        print(plotKaryograms(models, cluster=conf$cluster.plots))
+        dev.off()
+    }
 
-    fname <- args2fname(file.path(plotdir, "aneuploidyHeatmap"), ext=".pdf")
+    fname <- args2fname(file.path(plotdir, "profile"), ext=".pdf")
     if (!file.exists(fname)) {
         pdf(fname, width=30, height=max(0.3*length(models), 2/2.54))
         for (i in seq_along(models)) {
             message("Read density plot for: ", names(models)[i])
-            print(plot(models[[i]]))
+            print(plotProfile(models[[i]]))
         }
         dev.off()
     }
