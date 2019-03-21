@@ -167,3 +167,65 @@ transCoord <- function(gr) {
     gr$end.genome <- end(gr) + cum.seqlengths.0[as.character(seqnames(gr))]
     return(gr)
 }
+
+#' Plotting function for \code{\link{aneuHMM}} objects
+#'
+#' Make different types of plots for \code{\link{aneuHMM}} objects.
+#'
+#' @param x An \code{\link{aneuHMM}} object.
+#' @param type Type of the plot, one of \code{c('profile', 'histogram',
+#'   'karyogram')}. You can also specify the type with an integer number.
+#' \describe{
+#'   \item{\code{karyogram}}{A karyogram-like chromosome overview with CNV-state.}
+#'   \item{\code{histogram}}{A histogram of binned read counts with fitted mixture distribution.}
+#'   \item{\code{karyogram}}{An profile with read counts and CNV-state.}
+#' }
+#' @param ... Additional arguments for the different plot types.
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object.
+#' @method plot aneuHMM
+#' @export
+plot.aneuHMM <- function(x, type='profile', ...) {
+    if (type == 'karyogram' | type==3) {
+        plotKaryogram(x, ...)
+    } else if (type == 'histogram' | type==2) {
+        plotHistogram(x, ...)
+    } else if (type == 'profile' | type==1) {
+        plotProfile(x, ...)
+    }
+}
+
+#' Plotting function for \code{\link{aneuBiHMM}} objects
+#'
+#' Make different types of plots for \code{\link{aneuBiHMM}} objects.
+#'
+#' @param x An \code{\link{aneuBiHMM}} object.
+#' @param type Type of the plot, one of \code{c('profile', 'histogram',
+#'   'karyogram')}. You can also specify the type with an integer number.
+#' \describe{
+#'   \item{\code{profile}}{An profile with read counts and CNV-state.}
+#'   \item{\code{histogram}}{A histogram of binned read counts with fitted mixture distribution.}
+#'   \item{\code{karyogram}}{A karyogram-like chromosome overview with CNV-state.}
+#' }
+#' @param ... Additional arguments for the different plot types.
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object.
+#' @method plot aneuBiHMM
+#' @export
+plot.aneuBiHMM <- function(x, type='profile', ...) {
+    if (type == 'karyogram' | type==3) {
+        args <- names(list(...))
+        if ('both.strands' %in% args) {
+            plotKaryogram(x, ...)
+        } else {
+            plotKaryogram(x, both.strands=TRUE, ...)
+        }
+    } else if (type == 'histogram' | type==2) {
+        plotBivariateHistograms(x, ...)
+    } else if (type == 'profile' | type==1) {
+        args <- names(list(...))
+        if ('both.strands' %in% args) {
+            plotProfile(x, ...)
+        } else {
+            plotProfile(x, both.strands=TRUE, ...)
+        }
+    }
+}
