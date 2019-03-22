@@ -51,7 +51,7 @@ adjustBins <- function(bins, reads) {
         skipped.chroms <- character()
 
         # Pick only every mediancount read for each chromosome separately.
-        for (chrom in unique(seqnames(reads))) {
+        for (chrom in unique(seqnames(bins))) {
             reads.chr <- reads[seqnames(reads)==chrom]
             if (length(reads.chr) >= mediancount){
                 idx <- seq(mc.perstep[istep], length(reads.chr), by=mediancount)
