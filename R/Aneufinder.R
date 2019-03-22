@@ -111,11 +111,11 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
         inputfolder = list.files(inputfolder, "\\.(bam|bed(\\.gz)?)$", full.names=TRUE)
     names(inputfolder) <- tools::file_path_sans_ext(basename(inputfolder))
 
-    if (is.null(assembly))
+    if (is.null(assembly)) {
         seqinfo <- genome(inputfolder[1])
-    else {
-        seqinfo <- genome(assembly)
         assembly <- unique(GenomeInfoDb::genome(seqinfo))
+    } else {
+        seqinfo <- genome(assembly)
     }
 
     ###
