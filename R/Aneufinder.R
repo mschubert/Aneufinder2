@@ -125,13 +125,19 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
         "fixed", binsize=binsizes, stepsize=stepsizes)
     if (file.exists(fname) && conf$reuse.existing.files) {
         bins <- readRDS(fname)
+        changed <- FALSE
     } else {
         bins <- genomeBins(seqinfo, binsize=binsizes,
                            reads.per.bin=reads.per.bin, stepsize=stepsizes)
-        if ("GC" %in% correction.method && is.null(variable.width.reference))
-            bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
-        saveRDS(bins, file=fname)
+        changed <- TRUE
     }
+    if ("GC" %in% correction.method && is.null(variable.width.reference) &&
+            ! "GC.content" %in% colnames(bins)) {
+        bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
+        changed <- TRUE
+    }
+    if (changed)
+        saveRDS(bins, file=fname)
 
     if (!is.null(variable.width.reference)) {
         reads <- readGRanges(variable.width.reference)
@@ -139,12 +145,17 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
             "variable", binsize=binsizes, stepsize=stepsizes)
         if (file.exists(fname) && conf$reuse.existing.files) {
             bins <- readRDS(fname)
+            changed <- FALSE
         } else {
             bins <- adjustBins(bins, reads)
-            if ("GC" %in% correction.method)
-                bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
-            saveRDS(bins, file=fname)
+            changed <- TRUE
         }
+        if ("GC" %in% correction.method && ! "GC.content" %in% colnames(bins)) {
+            bins <- addGCcontent(bins, BSgenome=GC.BSgenome)
+            changed <- TRUE
+        }
+        if (changed)
+            saveRDS(bins, file=fname)
     }
 
     # missing: filtered reads -- file.path(conf[['outputfolder']],'filtered')
