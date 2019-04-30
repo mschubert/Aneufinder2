@@ -193,7 +193,10 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     fname <- args2fname(file.path(plotdir, "karyograms"), ext=".pdf")
     if (!file.exists(fname)) {
         pdf(fname, width=20, height=length(models)+4)
-        print(plotKaryograms(models, cluster=conf$cluster.plots))
+        #print(plotKaryograms(models, cluster=conf$cluster.plots))
+        for(i in seq_along(models)){
+            print(plotKaryogram(models[[i]]))
+        }
         dev.off()
     }
 

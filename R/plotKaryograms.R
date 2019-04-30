@@ -19,3 +19,4 @@ plotKaryograms <- function(models, cluster=FALSE) {
               axis.text.x = element_blank(),
               axis.ticks.x = element_blank())
 }
+
