@@ -202,13 +202,10 @@ Aneufinder <- function(inputfolder, outputfolder, assembly, configfile=NULL,
     ###
     plotdir <- makedir(conf$outputfolder, "PLOTS")
 
-    fname <- args2fname(file.path(plotdir, "karyograms"), ext=".pdf")
+    fname <- args2fname(file.path(plotdir, "heatmapGenomewide"), ext=".pdf")
     if (!file.exists(fname)) {
         pdf(fname, width=20, height=length(models)+4)
-        #print(plotKaryograms(models, cluster=conf$cluster.plots))
-        for(i in seq_along(models)){
-            print(plotKaryogram(models[[i]]))
-        }
+        print(heatmapGenomewide(models, cluster=conf$cluster.plots))
         dev.off()
     }
 

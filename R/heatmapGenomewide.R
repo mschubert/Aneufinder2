@@ -1,4 +1,4 @@
-plotKaryograms <- function(models, cluster=FALSE) {
+heatmapGenomewide <- function(models, cluster=FALSE) {
     if ("aneuHMM" %in% class(models))
         models = list(models)
 
