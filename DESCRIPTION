@@ -1,10 +1,10 @@
-Package: AneuFinder2
+Package: Aneufinder2
 Type: Package
 Title: Analysis of Copy Number Variation in Single-Cell-Sequencing Data
-Version: 1.11.2
+Version: 1.99.0
 Author: Aaron Taudt, Bjorn Bakker, David Porubsky
 Maintainer: Aaron Taudt <aaron.taudt@gmail.com>
-Description: AneuFinder implements functions for copy-number detection,
+Description: Aneufinder implements functions for copy-number detection,
     breakpoint detection, and karyotype and heterogeneity analysis in
     single-cell whole genome sequencing and strand-seq data.
 Depends:
@@ -34,6 +34,7 @@ Imports:
     ggdendro,
     ggrepel,
     ReorderCluster,
+    RcppTOML,
     mclust
 Suggests:
     knitr,
@@ -44,7 +45,6 @@ Suggests:
 License: Artistic-2.0
 LazyLoad: yes
 VignetteBuilder: knitr
-Packaged: 2016-05-27 13:29:00 CET+1; Taudt
 biocViews: ImmunoOncology, Software, Sequencing, SingleCell,
     CopyNumberVariation, GenomicVariation, HiddenMarkovModel, WholeGenome
 URL: https://github.com/ataudt/aneufinder.git

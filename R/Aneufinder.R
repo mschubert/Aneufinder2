@@ -63,10 +63,10 @@
 #' ## The following call produces plots and genome browser files for all BAM files in "my-data-folder"
 #' Aneufinder(inputfolder="my-data-folder", outputfolder="my-output-folder")
 #' }
-Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
-                       reuse.existing.files=TRUE, binsizes=1e6,
+Aneufinder <- function(inputfolder, outputfolder, assembly, configfile=NULL,
+                       numCPU=1, reuse.existing.files=TRUE, binsizes=1e6,
                        stepsizes=binsizes, variable.width.reference=NULL,
-                       reads.per.bin=NULL, pairedEndReads=FALSE, assembly=NULL,
+                       reads.per.bin=NULL, pairedEndReads=FALSE,
                        chromosomes=NULL, remove.duplicate.reads=TRUE,
                        min.mapq=10, blacklist=NULL, use.bamsignals=FALSE,
                        reads.store=FALSE, correction.method=NULL,
@@ -80,10 +80,12 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
                        hotspot.pval=5e-2, cluster.plots=TRUE) {
 
     # load config params, but arguments take priority
-    conf <- readConfig(configfile)
+    conf <- list()
+    if (!is.null(configfile))
+        conf <- RcppTOML::parseTOML(configfile)
     args <- lapply(as.list(match.call())[-1], eval, envir=parent.frame())
     conf <- utils::modifyList(conf, args)
-    conf$reuse.existing.files <- reuse.existing.files #FIXME: take this from call
+    conf$reuse.existing.files <- reuse.existing.files #FIXME: take this from call (match w/ default args)
     conf$cluster.plots <- cluster.plots
 #    checkClass(conf=conf) # this is still too verbose
     # ^^ also should check/set [most will be done in checkClass already]:
@@ -106,17 +108,11 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     #  blacklist also has right chromosomes
 
     makedir(conf$outputfolder)
+    seqinfo <- genome(assembly)
 
     if (length(inputfolder) == 1 && dir.exists(inputfolder))
         inputfolder = list.files(inputfolder, "\\.(bam|bed(\\.gz)?)$", full.names=TRUE)
     names(inputfolder) <- tools::file_path_sans_ext(basename(inputfolder))
-
-    if (is.null(assembly)) {
-        seqinfo <- genome(inputfolder[1])
-        assembly <- unique(GenomeInfoDb::genome(seqinfo))
-    } else {
-        seqinfo <- genome(assembly)
-    }
 
     ###
     ### Bin the genome
@@ -159,6 +155,10 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     }
 
     # missing: filtered reads -- file.path(conf[['outputfolder']],'filtered')
+    if (is.null(chromosomes))
+        bins = GenomeInfoDb::keepStandardChromosomes(bins, pruning.mode="coarse")
+    else
+        bins = GenomeInfoDb::keepSeqlevels(bins, chromosomes, pruning.mode="coarse")
 
     ###
     ### Assign reads to bins
@@ -201,6 +201,7 @@ Aneufinder <- function(inputfolder, outputfolder, configfile=NULL, numCPU=1,
     ### Make plots
     ###
     plotdir <- makedir(conf$outputfolder, "PLOTS")
+
     fname <- args2fname(file.path(plotdir, "karyograms"), ext=".pdf")
     if (!file.exists(fname)) {
         pdf(fname, width=20, height=length(models)+4)
