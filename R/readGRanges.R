@@ -3,6 +3,7 @@
 #' @param x  File name to read into GRanges object
 #' @param seqinfo  Seqinfo object with metadata about the genome
 #' @return  A GRanges object containing all the reads of the sequence file
+#' @export
 readGRanges <- function(x, seqinfo=GenomeInfoDb::seqinfo(x), ...) {
     UseMethod("readGRanges")
 }
