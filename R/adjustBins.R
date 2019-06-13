@@ -51,9 +51,9 @@ adjustBins <- function(bins, reads) {
         skipped.chroms <- character()
 
         # Pick only every mediancount read for each chromosome separately.
-        for (chrom in unique(seqnames(bins))) {
+        for (chrom in intersect(seqnames(bins), seqnames(reads))) {
             reads.chr <- reads[seqnames(reads)==chrom]
-            if (length(reads.chr) >= mediancount){
+            if (length(reads.chr) >= mediancount) {
                 idx <- seq(mc.perstep[istep], length(reads.chr), by=mediancount)
                 subreads[[chrom]] <- reads.chr[idx]
             } else {
@@ -72,14 +72,13 @@ adjustBins <- function(bins, reads) {
         bins.split <- split(bins, seqnames(bins))
 
         # Remove first bin for smaller than median count steps (overlapping bins).
-        if (mc.perstep[istep] < mediancount) {
-            bins.split <- endoapply(bins.split, function(x) { x[-1] })
-        }
+        if (mc.perstep[istep] < mediancount)
+            bins.split <- endoapply(bins.split, function(x) x[-1])
 
         # We don't want incomplete bins (number of reads < median count) at the
         # end of each chromosome.
         bins.split <- endoapply(bins.split, function(x) { x[-length(x)] })
-        bins <- unlist(bins.split, use.names=FALSE)
+        bins <- do.call(c, unname(bins.split))
         bins <- bins[!seqnames(bins) %in% skipped.chroms]
         bins <- keepSeqlevels(bins, setdiff(seqlevels(bins), skipped.chroms))
     }
