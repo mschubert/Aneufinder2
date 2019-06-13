@@ -218,4 +218,8 @@ Aneufinder <- function(inputfolder, outputfolder, assembly, configfile=NULL,
         }
         dev.off()
     }
+
+    # copy inst to readme
+    success = file.copy(system.file("README.txt", package="Aneufinder2", mustWork=TRUE),
+                        conf$outputfolder)
 }
