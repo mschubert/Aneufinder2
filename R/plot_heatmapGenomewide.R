@@ -52,9 +52,10 @@ heatmapGenomewide <- function(models, cluster=FALSE) {
         segs
     }))
 
-    ggplot(segs, aes(color=state), fill="red") +
-        geom_segment(aes(x=start, xend=end, y=ID, yend=ID), size=10) +
-        facet_grid(. ~ seqnames, scales="free_x") +
+    ggplot(segs, aes(color=state)) +
+        geom_segment(aes(x=start, xend=end, y=ID, yend=ID), size=8) +
+        facet_grid(. ~ seqnames, scales="free_x", space="free_x") +
+        scale_color_manual(values=stateColors(levels(segs$state))) +
         theme(panel.spacing = unit(0, "lines"),
               panel.grid.major = element_blank(),
               panel.grid.minor = element_blank(),

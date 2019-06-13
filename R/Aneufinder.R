@@ -204,7 +204,7 @@ Aneufinder <- function(inputfolder, outputfolder, assembly, configfile=NULL,
 
     fname <- args2fname(file.path(plotdir, "heatmapGenomewide"), ext=".pdf")
     if (!file.exists(fname)) {
-        pdf(fname, width=20, height=length(models)+4)
+        pdf(fname, width=20, height=(length(models)+4)/4)
         print(heatmapGenomewide(models, cluster=conf$cluster.plots))
         dev.off()
     }
