@@ -79,7 +79,7 @@ adjustBins <- function(bins, reads) {
         # end of each chromosome.
         bins.split <- endoapply(bins.split, function(x) { x[-length(x)] })
         bins <- do.call(c, unname(bins.split))
-        bins <- bins[!seqnames(bins) %in% skipped.chroms]
+        bins <- bins[!as.character(seqnames(bins)) %in% skipped.chroms]
         bins <- keepSeqlevels(bins, setdiff(seqlevels(bins), skipped.chroms))
     }
 
