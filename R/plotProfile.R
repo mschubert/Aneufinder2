@@ -89,7 +89,7 @@ plotProfile <- function(model) {
     }
     distributions       <- as.data.frame(distributions)
     names(distributions) <- c("x",c.state.labels)
-    distributions$total <- apply(distributions[,-1], 1, sum)                                                           # Total
+    distributions$total <- apply(distributions[,-1, drop=FALSE], 1, sum)                                                           # Total
     distributions       <- stats::reshape(distributions, direction="long", varying=1+1:(numstates+1),                  # Reshape the data.frame for plotting with ggplot
                                           v.names="density", timevar="state", times=c(c.state.labels,"total"))
     bhist               <- bhist + geom_line(aes_string(x='x', y='density', group='state', col='state'),               # Plot the distributions
